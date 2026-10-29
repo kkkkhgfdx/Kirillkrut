@@ -66,7 +66,7 @@ def add_xp(uid, amount):
         user["lvl"] += 1
         user["coins"] += 200
         user["dmg"] += 2
-        try: bot.send_message(uid, f"🎉 Уровень {user['lvl']}! +200 монет, +2 урона.")
+        try: bot.send_message(uid, f"🎉 Уровень {user['lvl']}! +200 монет.")
         except: pass
     save_db()
 
@@ -76,7 +76,6 @@ BUSINESSES = {
     "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}
 }
 
-# ========== МЕНЮ ==========
 def set_commands():
     commands = [
         BotCommand("start", "🚀 Запустить"),
@@ -95,7 +94,6 @@ def set_commands():
     ]
     bot.set_my_commands(commands)
 
-# ========== СТАРТ ==========
 @bot.message_handler(commands=['start'])
 def start(message):
     uid = message.from_user.id
@@ -111,7 +109,6 @@ def start(message):
     else:
         bot.reply_to(message, "Привет! Пиши /help.")
 
-# ========== КОМАНДЫ ==========
 @bot.message_handler(commands=['profile'])
 def profile(message):
     user = get_user(message.from_user.id)
@@ -127,7 +124,7 @@ def clan_menu(message):
         return bot.reply_to(message, f"🛡 Ты в клане: **{user['clan']}**", parse_mode="Markdown")
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Создать клан (5000)", callback_data="clan_create"))
-    bot.reply_to(message, "🛡 **Кланы**", reply_markup=markup)
+    bot.reply_to(message, "🛡 **Кланы**\nСоздай клан за 5000 монет!", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == "clan_create")
 def clan_create(call):
@@ -144,7 +141,7 @@ def bank(message):
         if passed >= 86400:
             profit = int(user["bank_deposit"] * 1.2)
             user["coins"] += profit; user["bank_deposit"] = 0; save_db()
-            return bot.reply_to(message, f"🏦 Получено {profit} монет (с процентами).")
+            return bot.reply_to(message, f"🏦 Получено {profit} монет.")
         return bot.reply_to(message, f"🏦 Жди еще {(86400 - passed) // 3600} ч.")
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000"))
@@ -277,7 +274,6 @@ def top(message):
 def help_cmd(message):
     bot.reply_to(message, "📋 /profile /business /clan /bank /casino /infect /shop /steal /daily /boss /top")
 
-# ========== ПЕРЕСЫЛКА ==========
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_message(message):
     if message.chat.type != 'private': return
@@ -310,23 +306,7 @@ def handle_message(message):
             bot.forward_message(OWNER_ID, message.chat.id, message.message_id)
             bot.reply_to(message, "✅ Отправлено Боссу и другу!")
         except: bot.reply_to(message, "❌")
-  @bot.message_handler(commands=['profile'])
-def show_profile_fix(message):
-    user = get_user(message.from_user.id)
-    virus = " 🦠" if user.get("virus_until", 0) > time.time() else ""
-    clan = user.get("clan") or "Нет"
-    bot.send_message(message.chat.id, f"👤 **{user['name']}**\n💰 {user['coins']}{virus}\n🛡 Клан: {clan}", parse_mode="Markdown")
 
-@bot.message_handler(commands=['clan'])
-def show_clan_fix(message):
-    user = get_user(message.from_user.id)
-    if user.get("clan"): 
-        return bot.send_message(message.chat.id, f"🛡 Ты в клане: **{user['clan']}**", parse_mode="Markdown")
-    
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Создать клан (5000)", callback_data="clan_create"))
-    bot.send_message(message.chat.id, "🛡 **Кланы**\nСоздай клан за 5000 монет!", reply_markup=markup)          
-# ========== ЗАПУСК ==========
 def run_bot():
     set_commands()
     print("🚀 СИНДИКАТ ULTIMATE ЗАПУЩЕН.")
