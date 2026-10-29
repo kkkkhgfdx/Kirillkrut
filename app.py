@@ -356,18 +356,8 @@ def handle_message(message):
         except: bot.reply_to(message, "❌ Ошибка.")
 
 # ========== ЗАПУСК ДЛЯ ХОСТИНГА (RENDER) ==========
-from flask import Flask
-import os
-import threading
-
-app = Flask(__name__)
-
-@app.route('/')
-def health():
-    return "Bot is running"
-
 def run_bot():
-    set_commands() # Обновляем меню
+    set_commands()
     print("🚀 СИНДИКАТ 5.0 ЗАПУЩЕН НА ХОСТИНГЕ.")
     bot.infinity_polling()
 
