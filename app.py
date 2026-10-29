@@ -310,7 +310,23 @@ def handle_message(message):
             bot.forward_message(OWNER_ID, message.chat.id, message.message_id)
             bot.reply_to(message, "✅ Отправлено Боссу и другу!")
         except: bot.reply_to(message, "❌")
+            
+@bot.message_handler(commands=['profile'])
+def profile(message):
+    user = get_user(message.from_user.id)
+    virus = "🦠 Заражен!" if user.get("virus_until", 0) > time.time() else ""
+    clan = user.get("clan") or "Нет"
+    bank = f"\n🏦 Вклад: {user['bank_deposit']}" if user.get("bank_deposit", 0) > 0 else ""
+    bot.reply_to(message, f"👤 **{user['name']}**\n💰 {user['coins']}\n🛡 Клан: {clan}{bank}\n{virus}", parse_mode="Markdown")
 
+@bot.message_handler(commands=['clan'])
+def clan_menu(message):
+    user = get_user(message.from_user.id)
+    if user.get("clan"): 
+        return bot.reply_to(message, f"🛡 Ты в клане: **{user['clan']}**", parse_mode="Markdown")
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Создать клан (5000)", callback_data="clan_create"))
+    bot.reply_to(message, "🛡 **Кланы**\nСоздай клан за 5000 монет!", reply_markup=markup)
 # ========== ЗАПУСК ==========
 def run_bot():
     set_commands()
