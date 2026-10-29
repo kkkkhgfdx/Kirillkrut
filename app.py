@@ -310,23 +310,22 @@ def handle_message(message):
             bot.forward_message(OWNER_ID, message.chat.id, message.message_id)
             bot.reply_to(message, "✅ Отправлено Боссу и другу!")
         except: bot.reply_to(message, "❌")
-            
-@bot.message_handler(commands=['profile'])
-def profile(message):
+  @bot.message_handler(commands=['profile'])
+def show_profile_fix(message):
     user = get_user(message.from_user.id)
-    virus = "🦠 Заражен!" if user.get("virus_until", 0) > time.time() else ""
+    virus = " 🦠" if user.get("virus_until", 0) > time.time() else ""
     clan = user.get("clan") or "Нет"
-    bank = f"\n🏦 Вклад: {user['bank_deposit']}" if user.get("bank_deposit", 0) > 0 else ""
-    bot.reply_to(message, f"👤 **{user['name']}**\n💰 {user['coins']}\n🛡 Клан: {clan}{bank}\n{virus}", parse_mode="Markdown")
+    bot.send_message(message.chat.id, f"👤 **{user['name']}**\n💰 {user['coins']}{virus}\n🛡 Клан: {clan}", parse_mode="Markdown")
 
 @bot.message_handler(commands=['clan'])
-def clan_menu(message):
+def show_clan_fix(message):
     user = get_user(message.from_user.id)
     if user.get("clan"): 
-        return bot.reply_to(message, f"🛡 Ты в клане: **{user['clan']}**", parse_mode="Markdown")
+        return bot.send_message(message.chat.id, f"🛡 Ты в клане: **{user['clan']}**", parse_mode="Markdown")
+    
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Создать клан (5000)", callback_data="clan_create"))
-    bot.reply_to(message, "🛡 **Кланы**\nСоздай клан за 5000 монет!", reply_markup=markup)
+    bot.send_message(message.chat.id, "🛡 **Кланы**\nСоздай клан за 5000 монет!", reply_markup=markup)          
 # ========== ЗАПУСК ==========
 def run_bot():
     set_commands()
