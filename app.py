@@ -6,7 +6,8 @@ import json
 import os
 import time
 import threading
-
+from flask import Flask
+app = Flask(__name__)
 # ========== НАСТРОЙКИ ==========
 TOKEN = "9291373316:AAGlBUAKEvAmsbVTn542imkEBCYrMG0Rry0" 
 OWNER_ID = 6170286634       # ТЫ (Босс)
