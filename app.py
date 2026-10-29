@@ -9,7 +9,7 @@ import time
 import threading
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "9291373316:AAGlBUAKEvAmsbVTn542imkEBCYrMG0Rry0" 
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0" 
 OWNER_ID = 6170286634       
 FRIEND_ID = 7527864291      
 CHAT_ID = -1002021366605    
