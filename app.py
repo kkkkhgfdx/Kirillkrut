@@ -325,6 +325,40 @@ def handle_msg(msg):
         else:
             try: bot.forward_message(FRIEND_ID, msg.chat.id, msg.message_id); bot.forward_message(OWNER_ID, msg.chat.id, msg.message_id)
             except: pass
+@bot.message_handler(commands=['top'])
+def top(msg):
+    sorted_users = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True)
+    if not sorted_users: return bot.reply_to(msg, "Пока никто не играл.")
+    text = "🏆 **Полный топ игроков:**\n\n"
+    for i, (uid, d) in enumerate(sorted_users, 1):
+        text += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} монет\n"
+    for x in range(0, len(text), 4000):
+        bot.send_message(msg.chat.id, text[x:x+4000], parse_mode="Markdown")
+
+@bot.message_handler(commands=['loan'])
+def loan(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    if u["debt"] > 0: return bot.reply_to(msg, "❌ Сначала верни прошлый долг!")
+    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 Ты взял 1000. Долг: 1500.")
+
+@bot.message_handler(commands=['rob'])
+def rob(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    u["last_rob"] = time.time()
+    if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 Ты ограбил казну и получил +300!")
+    else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 Тебя поймали! Штраф: -{p}")
+
+@bot.message_handler(commands=['achieves'])
+def show_achieves(msg):
+    u = get_u(msg.from_user.id)
+    if not u.get("achieves"): return bot.reply_to(msg, "У тебя пока нет ачивок.")
+    bot.reply_to(msg, f"🏆 **Твои ачивки:**\n" + "\n".join([f"• {a}" for a in u["achieves"]]), parse_mode="Markdown")
+
+@bot.message_handler(commands=['save'])
+def save_cmd(msg):
+    if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 База сохранена в канал!")
 
 def run_bot():
     print("🚀 СИНДИКАТ 32.0 ЗАПУЩЕН."); bot.infinity_polling()
