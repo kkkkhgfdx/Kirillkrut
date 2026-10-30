@@ -78,7 +78,9 @@ def start(msg):
     else: bot.reply_to(msg, "Привет! Пиши /help.", reply_markup=markup)
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /roulette /bank /loan /rob /boss /steal /infect /duel /daily /shop /top /achieves /save /reset")
+def help_cmd(msg):
+    bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /roulette /bank /loan /rob /boss /steal /infect /duel /daily /shop /top /achieves /save /reset")
+    
     @bot.message_handler(commands=['loan'])
 def loan(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
