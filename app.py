@@ -9,7 +9,7 @@ import time
 import threading
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "ТВОЙ_ТОКЕН_ЗДЕСЬ" # <--- ВСТАВЬ СЮДА СВОЙ ТОКЕН
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0" # <--- ВСТАВЬ СЮДА СВОЙ ТОКЕН
 OWNER_ID = 6170286634       
 FRIEND_ID = 7527864291      
 CHAT_ID = -1002021366605    
