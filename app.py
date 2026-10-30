@@ -4,7 +4,8 @@ from telebot.types import BotCommand
 from flask import Flask
 import random, json, os, time, threading
 
-TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"
+# ========== НАСТРОЙКИ ==========
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
 OWNER_ID = 6170286634
 FRIEND_ID = 7527864291
 CHAT_ID = -1004215885788
@@ -53,7 +54,7 @@ def add_xp(uid, amt):
 BUSINESSES = {"farm": {"name": "🌾 Ферма", "price": 1000, "income": 200, "cooldown": 3600}, "garden": {"name": "🌳 Сад", "price": 3000, "income": 500, "cooldown": 1800}, "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}}
 
 def set_cmds():
-    cmds = [BotCommand("start", "🚀 Старт"), BotCommand("profile", "👤 Профиль"), BotCommand("top", "🏆 Топ"), BotCommand("business", "🏢 Бизнесы"), BotCommand("shop", "🛒 Магазин"), BotCommand("bank", "🏦 Банк"), BotCommand("slots", "🎰 Слоты"), BotCommand("market", "🕵️ Рынок"), BotCommand("arena", "⚔️ Арена"), BotCommand("craft", "📦 Крафт"), BotCommand("casino", "🎲 Казино"), BotCommand("clan", "🛡 Кланы"), BotCommand("boss", "🐉 Босс"), BotCommand("daily", "🎁 Бонус"), BotCommand("save", "💾 Сохранить"), BotCommand("reset", "🧹 Обнулить")]
+    cmds = [BotCommand("start", "🚀 Старт"), BotCommand("profile", "👤 Профиль"), BotCommand("top", "🏆 Топ"), BotCommand("business", "🏢 Бизнесы"), BotCommand("shop", "🛒 Магазин"), BotCommand("slots", "🎰 Слоты"), BotCommand("market", "🕵️ Рынок"), BotCommand("arena", "⚔️ Арена"), BotCommand("craft", "📦 Крафт"), BotCommand("casino", "🎲 Казино"), BotCommand("clan", "🛡 Кланы"), BotCommand("boss", "🐉 Босс"), BotCommand("daily", "🎁 Бонус"), BotCommand("save", "💾 Сохранить"), BotCommand("reset", "🧹 Обнулить")]
     bot.set_my_commands(cmds)
 
 @bot.message_handler(commands=['save'])
@@ -64,7 +65,7 @@ def save_cmd(msg):
 def reset_cmd(msg):
     if msg.from_user.id != OWNER_ID: return
     parts = msg.text.split()
-    if len(parts) < 2: return
+    if len(parts) < 2: return bot.reply_to(msg, "❌ /reset @юзер")
     un = parts[1].replace("@", "").lower()
     for uid, d in users.items():
         if d.get("username", "").lower() == un: d["coins"] = 0; save_db(); bot.reply_to(msg, f"🧹 {un} обнулен!"); return
@@ -82,7 +83,7 @@ def get_target(msg):
 def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if msg.from_user.username: u["username"] = msg.from_user.username
-    if msg.from_user.id == OWNER_ID: bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 23.0. Добавлены Слоты, Рынок, Арена и Крафт!")
+    if msg.from_user.id == OWNER_ID: bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 23.0. Кнопки убраны. Всё в меню /!")
     else: bot.reply_to(msg, "Привет! Пиши /help.")
 
 @bot.message_handler(commands=['slots'])
@@ -230,7 +231,7 @@ def clan_create(call):
     u["coins"] -= 5000; u["clan"] = f"К_{u['name']}"; bot.answer_callback_query(call.id, "✅!")
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /boss /daily /shop /top")
+def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /boss /daily /shop /top /save /reset")
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_msg(msg):
