@@ -10,26 +10,20 @@ import threading
 import requests
 import base64
 
-# ========== НАСТРОЙКИ ==========
 TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
 GITHUB_TOKEN = "ghp_" + "N8uU1yZWeC23aG2XRuABNaLS0FcJTZ2UknnQ"
 GITHUB_REPO = "kkkkhgfdx/Kirillkut" 
 GITHUB_FILE = "users.json" 
-
 OWNER_ID = 6170286634       
 FRIEND_ID = 7527864291      
 CHAT_ID = -1002021366605    
-
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
-
-# ========== АВТОСОХРАНЕНИЕ В GITHUB ==========
 DB_FILE = "users.json"
 users = {}
 boss_hp = 10000 
 pending_messages = {}
 crypto_price = 1000
-
 def load_from_github():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -41,7 +35,6 @@ def load_from_github():
     except Exception as e:
         print(f"Ошибка загрузки: {e}")
     return {}
-
 def save_to_github():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -91,13 +84,11 @@ def add_xp(uid, amount):
         try: bot.send_message(uid, f"🎉 Уровень {user['lvl']}! +200 монет, +2 урона.")
         except: pass
     save_db()
-
 BUSINESSES = {
     "farm": {"name": "🌾 Ферма", "price": 1000, "income": 200, "cooldown": 3600},
     "garden": {"name": "🌳 Сад", "price": 3000, "income": 500, "cooldown": 1800},
     "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}
 }
-
 def set_commands():
     commands = [
         BotCommand("start", "🚀 Запустить"), BotCommand("profile", "👤 Профиль"),
@@ -113,7 +104,6 @@ def set_commands():
         BotCommand("help", "📋 Справка")
     ]
     bot.set_my_commands(commands)
-
 @bot.message_handler(commands=['start'])
 def start(message):
     uid = message.from_user.id
@@ -128,7 +118,7 @@ def start(message):
         bot.send_message(uid, "👑 Босс, Синдикат 13.0. Всё на месте, включая рулетку и биржу!", reply_markup=markup)
     else:
         bot.reply_to(message, "Привет! Пиши /help.")
-
+        
 @bot.message_handler(commands=['quest'])
 def quest(message):
     user = get_user(message.from_user.id)
@@ -141,7 +131,6 @@ def quest(message):
     save_db()
     bot.reply_to(message, f"📜 Ты выполнил квест и получил **{reward} монет** и 20 XP!", parse_mode="Markdown")
 
-# ========== РУЛЕТКА И БИРЖА (ВОЗВРАЩЕНЫ) ==========
 @bot.message_handler(commands=['roulette'])
 def roulette(message):
     user = get_user(message.from_user.id)
@@ -299,7 +288,7 @@ def give(message):
             users[target_id]["coins"] += amount; save_db()
             bot.reply_to(message, f"💸 +{amount} игроку {target_id}!")
     else: bot.reply_to(message, "❌ /give [ID] [Сумма]")
-
+        
 @bot.message_handler(commands=['broadcast'])
 def broadcast(message):
     if message.from_user.id != OWNER_ID: return
@@ -372,7 +361,7 @@ def clan_top(message):
     for i, (name, score) in enumerate(sorted_clans, 1):
         text += f"{i}. {name} — {score} силы\n"
     bot.reply_to(message, text, parse_mode="Markdown")
-
+    
 @bot.message_handler(commands=['treasure'])
 def treasure(message):
     user = get_user(message.from_user.id)
@@ -423,7 +412,6 @@ def casino(message):
     elif res >= 32: user["coins"] += bet; bot.reply_to(message, f"🎰 +{bet}")
     else: user["coins"] -= bet; bot.reply_to(message, f"🎰 -{bet}")
     save_db()
-
 @bot.message_handler(commands=['shop'])
 def shop(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -444,7 +432,6 @@ def open_chest(call):
     else:
         user["dmg"] += 5; bot.answer_callback_query(call.id, "✅ +5 к урону навсегда!")
     save_db()
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
 def buy_callback(call):
     user = get_user(call.from_user.id); item = call.data.split("_")[1]
@@ -457,3 +444,11 @@ def buy_callback(call):
     if user["coins"] < price: return bot.answer_callback_query(call.id, "❌")
     user["coins"] -= price; user["businesses"][item] = 0; save_db()
     bot.answer_callback_query(call.id, "✅ Куплено!")
+def run_bot():
+    set_commands()
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
