@@ -8,7 +8,7 @@ import random, json, os, time, threading
 TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
 OWNER_ID = 6170286634
 FRIEND_ID = 7527864291
-CHAT_ID = -1004215885788  # <--- ТВОЯ ГРУППА ДЛЯ БАЗЫ
+CHAT_ID = -1004215885788  # Твоя группа (бот должен быть админом с правом закрепа)
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
@@ -19,7 +19,11 @@ def save_db():
         with open("users.json", "w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=4)
         with open("users.json", "rb") as f:
-            bot.send_document(CHAT_ID, f, caption="💾 База сохранена")
+            sent = bot.send_document(CHAT_ID, f, caption="💾 База сохранена")
+            try:
+                bot.pin_chat_message(CHAT_ID, sent.message_id, disable_notification=True)
+            except Exception as pin_err:
+                print(f"Не удалось закрепить: {pin_err}")
     except Exception as e: print(f"Ошибка сохранения: {e}")
 
 def load_db():
@@ -62,7 +66,7 @@ def set_cmds():
 @bot.message_handler(commands=['save'])
 def save_cmd(msg):
     if msg.from_user.id == OWNER_ID:
-        save_db(); bot.reply_to(msg, "💾 База сохранена в группу!")
+        save_db(); bot.reply_to(msg, "💾 База сохранена и закреплена в группе!")
 
 def get_target(msg):
     if msg.reply_to_message: return str(msg.reply_to_message.from_user.id), get_u(msg.reply_to_message.from_user.id)
@@ -79,7 +83,7 @@ def start(msg):
     if msg.from_user.username: u["username"] = msg.from_user.username
     if msg.from_user.id == OWNER_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True); markup.add("👤 Профиль", "🏢 Бизнесы", "🛡 Кланы", "🎁 Бонус")
-        bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 18.0. База в группе!", reply_markup=markup)
+        bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 19.0. База в группе с закрепом!", reply_markup=markup)
     else: bot.reply_to(msg, "Привет! Пиши /help.")
 
 @bot.message_handler(commands=['quest'])
@@ -326,7 +330,7 @@ def handle_msg(msg):
         except: bot.reply_to(msg, "❌")
 
 def run_bot():
-    set_cmds(); print("🚀 СИНДИКАТ 18.0 ЗАПУЩЕН."); bot.infinity_polling()
+    set_cmds(); print("🚀 СИНДИКАТ 19.0 ЗАПУЩЕН."); bot.infinity_polling()
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
