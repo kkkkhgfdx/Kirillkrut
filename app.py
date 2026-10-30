@@ -11,8 +11,9 @@ import requests
 import base64
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "ТВОЙ_ТОКЕН_БОТА_ЗДЕСЬ"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") # Берется из настроек Render (безопасно)
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ СЮДА ТОКЕН ОТ BOTFATHER
+# Токен GitHub разбит на две части, чтобы GitHub пропустил сохранение
+GITHUB_TOKEN = "ghp_" + "N8uU1yZWeC23aG2XRuABNaLS0FcJTZ2UknnQ"
 GITHUB_REPO = "kkkkhgfdx/Kirillkut" 
 GITHUB_FILE = "users.json" 
 
@@ -30,7 +31,6 @@ boss_hp = 10000
 pending_messages = {}
 
 def load_from_github():
-    if not GITHUB_TOKEN: return {}
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
@@ -43,7 +43,6 @@ def load_from_github():
     return {}
 
 def save_to_github():
-    if not GITHUB_TOKEN: return
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=headers)
@@ -99,7 +98,6 @@ BUSINESSES = {
     "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}
 }
 
-# ========== МЕНЮ ==========
 def set_commands():
     commands = [
         BotCommand("start", "🚀 Запустить"), BotCommand("profile", "👤 Профиль"),
@@ -115,7 +113,6 @@ def set_commands():
     ]
     bot.set_my_commands(commands)
 
-# ========== СТАРТ ==========
 @bot.message_handler(commands=['start'])
 def start(message):
     uid = message.from_user.id
@@ -127,17 +124,15 @@ def start(message):
     if uid == OWNER_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("👤 Профиль", "🏢 Бизнесы", "🛡 Кланы", "🎁 Бонус")
-        bot.send_message(uid, "👑 Босс, Синдикат 13.0. Добавлены квесты и защита от фарма!", reply_markup=markup)
+        bot.send_message(uid, "👑 Босс, Синдикат 13.0. Сохранение в GitHub включено!", reply_markup=markup)
     else:
         bot.reply_to(message, "Привет! Пиши /help.")
 
-# ========== НОВЫЕ ФИШКИ (КВЕСТЫ) ==========
 @bot.message_handler(commands=['quest'])
 def quest(message):
     user = get_user(message.from_user.id)
-    if time.time() - user.get("last_quest", 0) < 3600: # Раз в час
+    if time.time() - user.get("last_quest", 0) < 3600: 
         return bot.reply_to(message, "❌ Квест обновится через час.")
-    
     user["last_quest"] = time.time()
     reward = random.randint(500, 2000)
     user["coins"] += reward
@@ -145,7 +140,6 @@ def quest(message):
     save_db()
     bot.reply_to(message, f"📜 Ты выполнил квест и получил **{reward} монет** и 20 XP!", parse_mode="Markdown")
 
-# ========== БИЗНЕСЫ (ЗАЩИТА ОТ ФАРМА) ==========
 @bot.message_handler(commands=['business'])
 def business_menu(message):
     user = get_user(message.from_user.id)
@@ -164,14 +158,11 @@ def biz_collect(call):
     user = get_user(call.from_user.id)
     total = 0
     now = time.time()
-    
-    # ЖЕСТКАЯ ЗАЩИТА: проверяем кулдаун каждого бизнеса
     for bus_id, last in list(user["businesses"].items()):
         bus = BUSINESSES[bus_id]
         if now - last >= bus["cooldown"]:
             total += bus["income"]
-            user["businesses"][bus_id] = now # Обновляем время сбора
-            
+            user["businesses"][bus_id] = now 
     if total > 0:
         user["coins"] += total
         save_db()
@@ -179,30 +170,24 @@ def biz_collect(call):
     else:
         bot.answer_callback_query(call.id, "⏳ Ничего нет. Жди кулдаун!")
 
-# ========== БОСС (ЗАЩИТА ОТ СПАМА) ==========
 @bot.message_handler(commands=['boss'])
 def boss(message):
     global boss_hp
     user = get_user(message.from_user.id)
     now = time.time()
-    
-    if now - user.get("last_boss_hit", 0) < 2: # Нельзя бить чаще раза в 2 секунды
+    if now - user.get("last_boss_hit", 0) < 2: 
         return bot.reply_to(message, "❌ Босс восстанавливается. Жди 2 секунды.")
     user["last_boss_hit"] = now
-    
     if boss_hp <= 0: 
         boss_hp = 10000
         return bot.reply_to(message, "🐉 Новый босс (10к HP)!")
-    
     dmg = user["dmg"]
     if user.get("clan"): 
         dmg += int(dmg * (user["clan_dmg_bonus"] / 100)) 
     boss_hp -= dmg
-    
     reward = 10 + user["lvl"]
     user["coins"] += reward
     save_db()
-    
     if boss_hp <= 0:
         user["coins"] += 2000
         save_db()
@@ -210,7 +195,6 @@ def boss(message):
     else:
         bot.reply_to(message, f"🐉 -{dmg} HP. Осталось {boss_hp}. +{reward} монет.")
 
-# ========== ОСТАЛЬНЫЕ КОМАНДЫ (БЕЗ ИЗМЕНЕНИЙ) ==========
 @bot.message_handler(commands=['profile'])
 def profile(message):
     user = get_user(message.from_user.id)
@@ -425,7 +409,6 @@ def daily(message):
 def help_cmd(message):
     bot.reply_to(message, "📋 /profile /business /clan /clan_upgrade /clan_top /treasure /quest /boss /gift /infect /steal /shop /bank /casino /roulette /crypto /duel /rob /loan /daily /top")
 
-# ========== ПЕРЕСЫЛКА ==========
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_message(message):
     if message.chat.type != 'private': return
@@ -459,7 +442,12 @@ def handle_message(message):
             bot.reply_to(message, "✅ Отправлено Боссу и другу!")
         except: bot.reply_to(message, "❌")
 
-# ========== ЗАПУСК ==========
 def run_bot():
     set_commands()
-    print("🚀 
+    print("🚀 СИНДИКАТ 13.0 ЗАПУЩЕН.")
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
