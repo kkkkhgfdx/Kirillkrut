@@ -4,8 +4,7 @@ from telebot.types import BotCommand
 from flask import Flask
 import random, json, os, time, threading
 
-# ========== НАСТРОЙКИ ==========
-TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0" 
+TOKEN = "ТВОЙ_ТОКЕН_БОТА_ЗДЕСЬ"
 OWNER_ID = 6170286634
 FRIEND_ID = 7527864291
 CHAT_ID = -1004215885788
@@ -40,9 +39,9 @@ load_db()
 def get_u(uid, name=None):
     uid_str = str(uid)
     if uid_str not in users:
-        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "xp": 0, "dmg": 10, "name": name or "Игрок", "businesses": {}, "clan": None, "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_roulette": 0, "last_casino": 0, "last_daily": 0, "achieves": [], "last_arena": 0, "multi": 1, "last_steal": 0, "casino_plays": 0, "last_loan": 0, "last_rob": 0, "last_craft": 0}
+        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "xp": 0, "dmg": 10, "name": name or "Игрок", "businesses": {}, "clan": None, "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_roulette": 0, "last_casino": 0, "last_daily": 0, "achieves": [], "last_arena": 0, "multi": 1, "last_steal": 0, "casino_plays": 0, "last_loan": 0, "last_rob": 0, "last_craft": 0, "last_duel": 0}
     if name: users[uid_str]["name"] = name
-    for k, v in {"businesses": {}, "clan": None, "debt": 0, "dmg": 10, "name": "Игрок", "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_roulette": 0, "last_casino": 0, "last_daily": 0, "achieves": [], "last_arena": 0, "multi": 1, "last_steal": 0, "casino_plays": 0, "last_loan": 0, "last_rob": 0, "last_craft": 0}.items():
+    for k, v in {"businesses": {}, "clan": None, "debt": 0, "dmg": 10, "name": "Игрок", "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_roulette": 0, "last_casino": 0, "last_daily": 0, "achieves": [], "last_arena": 0, "multi": 1, "last_steal": 0, "casino_plays": 0, "last_loan": 0, "last_rob": 0, "last_craft": 0, "last_duel": 0}.items():
         if k not in users[uid_str]: users[uid_str][k] = v
     return users[uid_str]
 
@@ -94,7 +93,7 @@ def start(msg):
     if msg.from_user.username: u["username"] = msg.from_user.username
     give_achieve(msg.from_user.id, "Первые шаги", 100)
     markup = types.ReplyKeyboardRemove(selective=False)
-    if msg.from_user.id == OWNER_ID: bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 27.0. Кулдаун на крафт добавлен!", reply_markup=markup)
+    if msg.from_user.id == OWNER_ID: bot.send_message(msg.from_user.id, "👑 Босс, Синдикат 30.0. Всё готово!", reply_markup=markup)
     else: bot.reply_to(msg, "Привет! Пиши /help.", reply_markup=markup)
 
 @bot.message_handler(commands=['help'])
@@ -218,7 +217,7 @@ def arena(msg):
 @bot.message_handler(commands=['craft'])
 def craft(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_craft", 0) < 3600: return bot.reply_to(msg, "❌ Крафт доступен раз в час!")
+    if time.time() - u.get("last_craft", 0) < 3600: return bot.reply_to(msg, "❌ Крафт раз в час!")
     if u["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно 1000.")
     u["last_craft"] = time.time(); u["coins"] -= 1000
     if random.random() > 0.5: u["coins"] += 3000; bot.reply_to(msg, "📦 Золотой кейс! +3000")
@@ -335,8 +334,8 @@ def daily(msg):
 
 @bot.message_handler(commands=['clan'])
 def clan_menu(msg):
-    u = get_u(msg.from_user.id,msg.from_user.first_name)
-        if u.get("clan"): return bot.reply_to(msg, f"🛡 Клан: **{u['clan']}**", parse_mode="Markdown")
+        u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u.get("clan"): return bot.reply_to(msg, f"🛡 Клан: **{u['clan']}**", parse_mode="Markdown")
     m = types.InlineKeyboardMarkup()
     m.add(types.InlineKeyboardButton("Создать (5000)", callback_data="clan_create"))
     bot.reply_to(msg, "🛡 **Кланы**", reply_markup=m)
@@ -346,10 +345,6 @@ def clan_create(call):
     u = get_u(call.from_user.id)
     if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌")
     u["coins"] -= 5000; u["clan"] = f"К_{u['name']}"; give_achieve(call.from_user.id, "Клановод", 1000); bot.answer_callback_query(call.id, "✅!")
-@bot.message_handler(commands=['help'])
-def help_cmd(msg): 
-    markup = types.ReplyKeyboardRemove(selective=False)
-    bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /roulette /bank /loan /rob /boss /steal /infect /duel /daily /shop /top /achieves /save /reset", reply_markup=markup)
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_msg(msg):
@@ -367,10 +362,9 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    set_cmds()
-    print("🚀 СИНДИКАТ 27.0 ЗАПУЩЕН.")
-    bot.infinity_polling()
+    set_cmds(); print("🚀 СИНДИКАТ 30.0 ЗАПУЩЕН."); bot.infinity_polling()
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    u = get_u(msg.from_user.id, msg.from_user.first_na
