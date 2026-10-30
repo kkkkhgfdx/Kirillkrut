@@ -43,7 +43,8 @@ def save_to_github():
     content = base64.b64encode(json.dumps(users, ensure_ascii=False, indent=4).encode("utf-8")).decode("utf-8")
     data = {"message": "Auto-save bot data", "content": content}
     if sha: data["sha"] = sha
-    requests.put(url, headers=headers, json=data)
+    res = requests.put(url, headers=headers, json=data)
+print(f"СТАТУС СОХРАНЕНИЯ: {res.status_code}")
 
 users = load_from_github()
 
