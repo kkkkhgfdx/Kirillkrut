@@ -4,7 +4,7 @@ from telebot.types import BotCommand
 from flask import Flask
 import random, json, os, time, threading
 
-TOKEN = "ТВОЙ_ТОКЕН_БОТА_ЗДЕСЬ"
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"
 OWNER_ID = 6170286634
 FRIEND_ID = 7527864291
 CHAT_ID = -1004215885788
