@@ -50,8 +50,11 @@ def give_achieve(uid, name, reward):
     u = get_u(uid)
     if name not in u["achieves"]:
         u["achieves"].append(name); u["coins"] += reward
-        try: bot.send_message(uid, f"🏆 **Ачивка: {name}**\n+{reward} монет!", parse_mode="Markdown")
-        except: pass
+        try: 
+            # Отправляем в канал, чтобы все видели
+            bot.send_message(CHAT_ID, f"🏆 **НОВАЯ АЧИВКА!**\n👤 Игрок: **{u['name']}**\n🎖 Достижение: **{name}**\n💰 Награда: {reward} монет!", parse_mode="Markdown")
+        except Exception as e: 
+            print(f"Не удалось отправить в канал: {e}")
 
 def add_xp(uid, amt):
     u = get_u(uid); u["xp"] += amt
