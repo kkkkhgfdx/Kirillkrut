@@ -341,10 +341,7 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"),
-        BotCommand("clan", "Клан"), BotCommand("achieves", "Ачивки"), 
-        BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")
-    ]
+    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("clan", "Клан"), BotCommand("achieves", "Ачивки"), BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")]
     bot.set_my_commands(cmds)
     print("🚀 ЗАПУЩЕН!")
     bot.infinity_polling()
