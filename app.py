@@ -11,8 +11,7 @@ import requests
 import base64
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ СЮДА ТОКЕН ОТ BOTFATHER
-# Токен GitHub разбит на две части, чтобы GitHub пропустил сохранение
+TOKEN = "ТВОЙ_ТОКЕН_БОТА_ЗДЕСЬ"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
 GITHUB_TOKEN = "ghp_" + "N8uU1yZWeC23aG2XRuABNaLS0FcJTZ2UknnQ"
 GITHUB_REPO = "kkkkhgfdx/Kirillkut" 
 GITHUB_FILE = "users.json" 
@@ -29,6 +28,7 @@ DB_FILE = "users.json"
 users = {}
 boss_hp = 10000 
 pending_messages = {}
+crypto_price = 1000
 
 def load_from_github():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
@@ -65,10 +65,10 @@ def get_user(uid):
             "dmg": 10, "name": "Игрок", "businesses": {}, 
             "clan": None, "username": "", "crypto": 0, "bank_deposit": 0,
             "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0,
-            "last_boss_hit": 0, "last_biz_collect": 0
+            "last_boss_hit": 0, "last_biz_collect": 0, "last_roulette": 0
         }
         save_db()
-    defaults = {"businesses": {}, "clan": None, "debt": 0, "dmg": 10, "name": "Игрок", "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_biz_collect": 0}
+    defaults = {"businesses": {}, "clan": None, "debt": 0, "dmg": 10, "name": "Игрок", "username": "", "crypto": 0, "bank_deposit": 0, "has_chest": False, "clan_dmg_bonus": 0, "last_quest": 0, "last_boss_hit": 0, "last_biz_collect": 0, "last_roulette": 0}
     for k, v in defaults.items():
         if k not in users[uid_str]: users[uid_str][k] = v
     return users[uid_str]
@@ -109,7 +109,8 @@ def set_commands():
         BotCommand("clan_upgrade", "🛡 Прокачать клан"), BotCommand("clan_top", "⚔️ Топ кланов"),
         BotCommand("boss", "🐉 Босс"), BotCommand("infect", "🦠 Заразить"),
         BotCommand("steal", "🥷 Украсть"), BotCommand("gift", "🎁 Подарить"),
-        BotCommand("daily", "🎁 Бонус"), BotCommand("help", "📋 Справка")
+        BotCommand("daily", "🎁 Бонус"), BotCommand("duel", "🤺 Дуэль"),
+        BotCommand("help", "📋 Справка")
     ]
     bot.set_my_commands(commands)
 
@@ -124,7 +125,7 @@ def start(message):
     if uid == OWNER_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("👤 Профиль", "🏢 Бизнесы", "🛡 Кланы", "🎁 Бонус")
-        bot.send_message(uid, "👑 Босс, Синдикат 13.0. Сохранение в GitHub включено!", reply_markup=markup)
+        bot.send_message(uid, "👑 Босс, Синдикат 13.0. Всё на месте, включая рулетку и биржу!", reply_markup=markup)
     else:
         bot.reply_to(message, "Привет! Пиши /help.")
 
@@ -139,6 +140,64 @@ def quest(message):
     add_xp(message.from_user.id, 20)
     save_db()
     bot.reply_to(message, f"📜 Ты выполнил квест и получил **{reward} монет** и 20 XP!", parse_mode="Markdown")
+
+# ========== РУЛЕТКА И БИРЖА (ВОЗВРАЩЕНЫ) ==========
+@bot.message_handler(commands=['roulette'])
+def roulette(message):
+    user = get_user(message.from_user.id)
+    if time.time() - user.get("last_roulette", 0) < 86400:
+        return bot.reply_to(message, "❌ Рулетка раз в сутки.")
+    user["last_roulette"] = time.time()
+    if random.random() > 0.7:
+        win = random.randint(1000, 5000)
+        user["coins"] += win
+        bot.reply_to(message, f"🎡 ТЕБЕ ПОВЕЗЛО! +{win} монет!")
+    else:
+        loss = user["coins"] // 2
+        user["coins"] -= loss
+        bot.reply_to(message, f"🎡 НЕ ПОВЕЗЛО! Потеряно {loss} монет.")
+    save_db()
+
+@bot.message_handler(commands=['crypto'])
+def crypto(message):
+    global crypto_price
+    user = get_user(message.from_user.id)
+    text = f"📈 **Биржа Битков**\nКурс: {crypto_price} монет\nУ тебя: {user['crypto']} битков\n\n"
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Купить 1", callback_data="crypto_buy"))
+    markup.add(types.InlineKeyboardButton("Продать 1", callback_data="crypto_sell"))
+    bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("crypto_"))
+def crypto_trade(call):
+    global crypto_price
+    user = get_user(call.from_user.id)
+    if call.data == "crypto_buy":
+        if user["coins"] < crypto_price: return bot.answer_callback_query(call.id, "❌ Мало монет!")
+        user["coins"] -= crypto_price; user["crypto"] += 1; save_db()
+        bot.answer_callback_query(call.id, "✅ Куплен биток!")
+    else:
+        if user["crypto"] < 1: return bot.answer_callback_query(call.id, "❌ Нет битков!")
+        user["crypto"] -= 1; user["coins"] += crypto_price; save_db()
+        bot.answer_callback_query(call.id, "✅ Продан биток!")
+
+@bot.message_handler(commands=['duel'])
+def duel(message):
+    target_id, target = get_target(message)
+    if not target: return bot.reply_to(message, "❌ @юзер или Reply.")
+    if target_id == str(message.from_user.id): return bot.reply_to(message, "❌ Себя нельзя.")
+    user = get_user(message.from_user.id)
+    parts = message.text.split()
+    bet = int(parts[-1]) if parts[-1].isdigit() else 100
+    if user["coins"] < bet: return bot.reply_to(message, "❌ Мало монет.")
+    
+    if random.random() > 0.5:
+        user["coins"] += bet; target["coins"] -= bet
+        bot.reply_to(message, f"🤺 Ты победил {target['name']} и забрал {bet}!")
+    else:
+        user["coins"] -= bet; target["coins"] += bet
+        bot.reply_to(message, f"🤺 {target['name']} победил тебя и забрал {bet}.")
+    save_db()
 
 @bot.message_handler(commands=['business'])
 def business_menu(message):
@@ -398,56 +457,3 @@ def buy_callback(call):
     if user["coins"] < price: return bot.answer_callback_query(call.id, "❌")
     user["coins"] -= price; user["businesses"][item] = 0; save_db()
     bot.answer_callback_query(call.id, "✅ Куплено!")
-
-@bot.message_handler(commands=['daily'])
-def daily(message):
-    user = get_user(message.from_user.id)
-    user["coins"] += 500; add_xp(message.from_user.id, 100); user["has_chest"] = True; save_db()
-    bot.reply_to(message, "🎁 +500 монет и бесплатный Кейс! Открой его в /shop.")
-
-@bot.message_handler(commands=['help'])
-def help_cmd(message):
-    bot.reply_to(message, "📋 /profile /business /clan /clan_upgrade /clan_top /treasure /quest /boss /gift /infect /steal /shop /bank /casino /roulette /crypto /duel /rob /loan /daily /top")
-
-@bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
-def handle_message(message):
-    if message.chat.type != 'private': return
-    uid = message.from_user.id; name = message.from_user.first_name or "Кто-то"
-    user = get_user(uid)
-    if message.from_user.username: user["username"] = message.from_user.username; save_db()
-
-    if uid == OWNER_ID:
-        if message.text == "👤 Профиль": profile(message); return
-        if message.text == "🏢 Бизнесы": business_menu(message); return
-        if message.text == "🛡 Кланы": clan_menu(message); return
-        if message.text == "🎁 Бонус": daily(message); return
-        if message.reply_to_message:
-            target = pending_messages.get(message.reply_to_message.message_id)
-            if target:
-                try: bot.copy_message(target, message.chat.id, message.message_id); bot.reply_to(message, "✅ Отправлено!")
-                except: bot.reply_to(message, "❌")
-            else: bot.reply_to(message, "❌ Сделай Reply.")
-        else:
-            try:
-                bot.forward_message(FRIEND_ID, message.chat.id, message.message_id)
-                bot.forward_message(OWNER_ID, message.chat.id, message.message_id)
-                bot.reply_to(message, "✅ Отправлено другу и тебе!")
-            except: bot.reply_to(message, "❌")
-    else:
-        try:
-            sent = bot.forward_message(FRIEND_ID, message.chat.id, message.message_id)
-            pending_messages[sent.message_id] = uid
-            bot.send_message(FRIEND_ID, f"✉️ От {name}. Ответь.", reply_markup=types.ForceReply(selective=True))
-            bot.forward_message(OWNER_ID, message.chat.id, message.message_id)
-            bot.reply_to(message, "✅ Отправлено Боссу и другу!")
-        except: bot.reply_to(message, "❌")
-
-def run_bot():
-    set_commands()
-    print("🚀 СИНДИКАТ 13.0 ЗАПУЩЕН.")
-    bot.infinity_polling()
-
-if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
