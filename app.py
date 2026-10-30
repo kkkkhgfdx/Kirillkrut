@@ -79,3 +79,55 @@ def start(msg):
 
 @bot.message_handler(commands=['help'])
 def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /roulette /bank /loan /rob /boss /steal /infect /duel /daily /shop /top /achieves /save /reset")
+    @bot.message_handler(commands=['loan'])
+def loan(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    if u["debt"] > 0: return bot.reply_to(msg, "❌ Сначала верни прошлый долг!")
+    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 Ты взял 1000. Долг: 1500.")
+
+@bot.message_handler(commands=['rob'])
+def rob(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    u["last_rob"] = time.time()
+    if random.random() > 0.5: u["coins"] += 300; add_xp(msg.from_user.id, 10); bot.reply_to(msg, "🔫 Ты ограбил казну и получил +300!")
+    else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 Тебя поймали! Штраф: -{p}")
+
+@bot.message_handler(commands=['bank'])
+def bank(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u.get("bank_deposit", 0) > 0:
+        if time.time() - u.get("bank_time", 0) >= 86400:
+            profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 Вклад закрыт! Ты получил {profit} монет.")
+        else: bot.reply_to(msg, "🏦 Твой вклад еще работает. Жди 24 часа.")
+        return
+    markup = types.InlineKeyboardMarkup(); markup.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000"))
+    bot.reply_to(msg, "🏦 **Банк**\nВложи 1000 под 20% в сутки.", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "bank_1000")
+def bank_dep(call):
+    u = get_u(call.from_user.id)
+    if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало монет!")
+    u["coins"] -= 1000; u["bank_deposit"] = 1000; u["bank_time"] = time.time(); bot.answer_callback_query(call.id, "✅ Вложено 1000!")
+
+@bot.message_handler(commands=['daily'])
+def daily(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Раз в сутки!")
+    u["last_daily"] = time.time(); u["coins"] += 500; add_xp(msg.from_user.id, 100); u["has_chest"] = True; bot.reply_to(msg, "🎁 +500 и Кейс!")
+
+@bot.message_handler(commands=['casino'])
+def casino(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_casino", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 сек.")
+    parts = msg.text.split()
+    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /casino 100")
+    bet = int(parts[1])
+    if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало.")
+    u["last_casino"] = time.time(); u["casino_plays"] = u.get("casino_plays", 0) + 1
+    if u["casino_plays"] >= 10: give_achieve(msg.from_user.id, "Игроман", 1000)
+    bot.send_dice(msg.chat.id, emoji="🎰"); time.sleep(3); res = random.randint(1, 64)
+    if res == 64: u["coins"] += bet * 5; bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
+    elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
+    else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
