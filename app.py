@@ -11,7 +11,7 @@ import requests
 import base64
 
 # ========== НАСТРОЙКИ ==========
-TOKEN = "ТВОЙ_ТОКЕН_БОТА_ЗДЕСЬ"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
+TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0"  # <--- ВСТАВЬ ТОКЕН ОТ BOTFATHER
 GITHUB_TOKEN = "ghp_" + "N8uU1yZWeC23aG2XRuABNaLS0FcJTZ2UknnQ"
 GITHUB_REPO = "kkkkhgfdx/Kirillkut" 
 GITHUB_FILE = "users.json" 
