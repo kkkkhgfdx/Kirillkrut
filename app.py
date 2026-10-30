@@ -131,3 +131,50 @@ def casino(msg):
     if res == 64: u["coins"] += bet * 5; bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
     elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
     else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
+        @bot.message_handler(commands=['boss'])
+def boss(msg):
+    global boss_hp
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_boss_hit", 0) < 2: return bot.reply_to(msg, "❌ Жди 2 сек.")
+    u["last_boss_hit"] = time.time()
+    if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
+    dmg = u["dmg"] + int(u["dmg"] * (u.get("clan_dmg_bonus", 0) / 100)) if u.get("clan") else u["dmg"]
+    boss_hp -= dmg; r = 10 + u["lvl"]; u["coins"] += r
+    if boss_hp <= 0: u["coins"] += 2000; give_achieve(msg.from_user.id, "Босс-убийца", 5000); bot.send_message(msg.chat.id, f"💀 БОСС УБИТ! {u['name']} +2000!")
+    else: bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}. +{r}")
+
+@bot.message_handler(commands=['profile'])
+def profile(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name); c = u.get("clan") or "Нет"
+    bot.reply_to(msg, f"👤 **{u['name']}**\n🏅 Ур: {u['lvl']}\n💰 {u['coins']}\n⚔️ Урон: {u['dmg']}\n🛡 Клан: {c}\n🌟 Множитель: x{u.get('multi', 1)}\n🏆 Ачивок: {len(u.get('achieves', []))}", parse_mode="Markdown")
+
+@bot.message_handler(commands=['top'])
+def top(msg):
+    sorted_users = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True)
+    if not sorted_users: return bot.reply_to(msg, "Пока никто не играл.")
+    text = "🏆 **Полный топ игроков:**\n\n"
+    for i, (uid, d) in enumerate(sorted_users, 1):
+        text += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} монет\n"
+    for x in range(0, len(text), 4000):
+        bot.send_message(msg.chat.id, text[x:x+4000], parse_mode="Markdown")
+
+@bot.message_handler(commands=['save'])
+def save_cmd(msg):
+    if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 ОК!")
+
+@bot.message_handler(commands=['reset'])
+def reset_cmd(msg):
+    if msg.from_user.id != OWNER_ID: return
+    parts = msg.text.split()
+    if len(parts) < 2: return bot.reply_to(msg, "❌ /reset @юзер")
+    un = parts[1].replace("@", "").lower()
+    for uid, d in users.items():
+        if d.get("username", "").lower() == un: d["coins"] = 0; save_db(); bot.reply_to(msg, f"🧹 {un} обнулен!"); return
+
+def run_bot():
+    print("🚀 СИНДИКАТ ЗАПУЩЕН.")
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
