@@ -346,3 +346,50 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+# ========== ПАТЧ (ВОЗВРАЩАЕМ КОМАНДЫ) ==========
+@bot.message_handler(commands=['top'])
+def top(msg):
+    sorted_users = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True)
+    if not sorted_users: return bot.reply_to(msg, "Пока никто не играл.")
+    text = "🏆 **Топ игроков:**\n\n"
+    for i, (uid, d) in enumerate(sorted_users, 1):
+        text += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} монет\n"
+    bot.reply_to(msg, text[:4000], parse_mode="Markdown")
+
+@bot.message_handler(commands=['bank'])
+def bank(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u.get("bank_deposit", 0) > 0:
+        if time.time() - u.get("bank_time", 0) >= 86400:
+            profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 Вклад закрыт! +{profit} монет.")
+        else: bot.reply_to(msg, "🏦 Жди 24 часа.")
+        return
+    m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000")); bot.reply_to(msg, "🏦 Банк (20%)", reply_markup=m)
+
+@bot.callback_query_handler(func=lambda call: call.data == "bank_1000")
+def bank_dep(call):
+    u = get_u(call.from_user.id)
+    if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало!")
+    u["coins"] -= 1000; u["bank_deposit"] = 1000; u["bank_time"] = time.time(); bot.answer_callback_query(call.id, "✅ Вложено!")
+
+@bot.message_handler(commands=['rob'])
+def rob(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    u["last_rob"] = time.time()
+    if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 +300!")
+    else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 -{p}")
+
+@bot.message_handler(commands=['loan'])
+def loan(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    if u["debt"] > 0: return bot.reply_to(msg, "❌ Сначала верни долг!")
+    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 +1000. Долг: 1500.")
+
+@bot.message_handler(commands=['achieves'])
+def show_achieves(msg):
+    u = get_u(msg.from_user.id)
+    if not u["achieves"]: return bot.reply_to(msg, "У тебя пока нет ачивок.")
+    bot.reply_to(msg, f"🏆 **Твои ачивки:**\n" + "\n".join([f"• {a}" for a in u["achieves"]]), parse_mode="Markdown")
