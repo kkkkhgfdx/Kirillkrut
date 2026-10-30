@@ -348,14 +348,57 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 # ========== ПАТЧ (ВОЗВРАЩАЕМ КОМАНДЫ) ==========
+# ========== ФИНАЛЬНЫЙ ПАТЧ ==========
 @bot.message_handler(commands=['top'])
 def top(msg):
-    sorted_users = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True)
-    if not sorted_users: return bot.reply_to(msg, "Пока никто не играл.")
-    text = "🏆 **Топ игроков:**\n\n"
-    for i, (uid, d) in enumerate(sorted_users, 1):
-        text += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} монет\n"
-    bot.reply_to(msg, text[:4000], parse_mode="Markdown")
+    try:
+        sorted_users = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True)
+        if not sorted_users: return bot.reply_to(msg, "Пока никто не играл.")
+        text = "🏆 **Топ игроков:**\n\n"
+        for i, (uid, d) in enumerate(sorted_users, 1):
+            text += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} монет\n"
+        # Разбиваем на части, если сообщение слишком длинное
+        for x in range(0, len(text), 4000):
+            bot.send_message(msg.chat.id, text[x:x+4000], parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(msg, f"Ошибка: {e}")
+
+@bot.message_handler(commands=['boss'])
+def boss(msg):
+    global boss_hp
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_boss_hit", 0) < 2: return bot.reply_to(msg, "❌ Жди 2 сек.")
+    u["last_boss_hit"] = time.time()
+    if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
+    dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2
+    bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}.")
+
+@bot.message_handler(commands=['casino'])
+def casino(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_casino", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 сек.")
+    parts = msg.text.split()
+    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /casino 100")
+    bet = int(parts[1])
+    if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало.")
+    u["last_casino"] = time.time(); bot.send_dice(msg.chat.id, emoji="🎰"); time.sleep(3); res = random.randint(1, 64)
+    if res == 64: u["coins"] += bet * 5; bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
+    elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
+    else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
+
+# --- ОБНОВЛЯЕМ МЕНЮ КОМАНД ---
+def update_menu():
+    cmds = [
+        BotCommand("start", "Старт"), BotCommand("help", "Справка"),
+        BotCommand("profile", "Профиль"), BotCommand("top", "Топ игроков"),
+        BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"),
+        BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"),
+        BotCommand("casino", "Казино"), BotCommand("achieves", "Ачивки"),
+        BotCommand("save", "Сохранить базу")
+    ]
+    bot.set_my_commands(cmds)
+
+update_menu()
 
 @bot.message_handler(commands=['bank'])
 def bank(msg):
