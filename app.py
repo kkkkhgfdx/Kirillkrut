@@ -335,4 +335,42 @@ def daily(msg):
 
 @bot.message_handler(commands=['clan'])
 def clan_menu(msg):
-    u = get_u(msg.from_user
+    u = get_u(msg.from_user.id,msg.from_user.first_name)
+        if u.get("clan"): return bot.reply_to(msg, f"🛡 Клан: **{u['clan']}**", parse_mode="Markdown")
+    m = types.InlineKeyboardMarkup()
+    m.add(types.InlineKeyboardButton("Создать (5000)", callback_data="clan_create"))
+    bot.reply_to(msg, "🛡 **Кланы**", reply_markup=m)
+
+@bot.callback_query_handler(func=lambda call: call.data == "clan_create")
+def clan_create(call):
+    u = get_u(call.from_user.id)
+    if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌")
+    u["coins"] -= 5000; u["clan"] = f"К_{u['name']}"; give_achieve(call.from_user.id, "Клановод", 1000); bot.answer_callback_query(call.id, "✅!")
+@bot.message_handler(commands=['help'])
+def help_cmd(msg): 
+    markup = types.ReplyKeyboardRemove(selective=False)
+    bot.reply_to(msg, "📋 /profile /business /clan /slots /market /arena /craft /casino /roulette /bank /loan /rob /boss /steal /infect /duel /daily /shop /top /achieves /save /reset", reply_markup=markup)
+
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
+def handle_msg(msg):
+    if msg.chat.type != 'private': return
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if msg.from_user.username: u["username"] = msg.from_user.username
+    if msg.from_user.id == OWNER_ID:
+        if msg.reply_to_message:
+            t = pending_messages.get(msg.reply_to_message.message_id)
+            if t: 
+                try: bot.copy_message(t, msg.chat.id, msg.message_id); bot.reply_to(msg, "✅!")
+                except: pass
+        else:
+            try: bot.forward_message(FRIEND_ID, msg.chat.id, msg.message_id); bot.forward_message(OWNER_ID, msg.chat.id, msg.message_id)
+            except: pass
+
+def run_bot():
+    set_cmds()
+    print("🚀 СИНДИКАТ 27.0 ЗАПУЩЕН.")
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
