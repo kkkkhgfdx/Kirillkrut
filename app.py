@@ -274,3 +274,71 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    
+# ========== ПАТЧ: МАГАЗИН И БИЗНЕС ==========
+BUSINESSES = {
+    "farm": {"name": "🌾 Ферма", "price": 1000, "income": 200, "cooldown": 3600},
+    "garden": {"name": "🌳 Сад", "price": 3000, "income": 500, "cooldown": 1800},
+    "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}
+}
+
+@bot.message_handler(commands=['shop'])
+def shop_patch(msg):
+    m = types.InlineKeyboardMarkup(row_width=1)
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), 
+          types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), 
+          types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"))
+    bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
+def buy_patch(call):
+    u = get_u(call.from_user.id)
+    i = call.data.split("_")[1]
+    p = BUSINESSES[i]["price"]
+    if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
+    u["coins"] -= p
+    if "businesses" not in u: u["businesses"] = {}
+    u["businesses"][i] = 0
+    save_db()
+    bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
+
+@bot.message_handler(commands=['business'])
+def business_patch(msg):
+    u = get_u(msg.from_user.id)
+    if not u.get("businesses"): return bot.reply_to(msg, "🏢 Купи в /shop.")
+    text = "🏢 **БИЗНЕС**\n\n"
+    for b, l in u["businesses"].items(): 
+        text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
+    m = types.InlineKeyboardMarkup()
+    m.add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect"))
+    bot.reply_to(msg, text, reply_markup=m, parse_mode="Markdown")
+
+@bot.callback_query_handler(func=lambda call: call.data == "biz_collect")
+def biz_collect_patch(call):
+    u = get_u(call.from_user.id)
+    total = 0
+    for b, l in list(u["businesses"].items()):
+        if time.time() - l >= BUSINESSES[b]["cooldown"]: 
+            total += BUSINESSES[b]["income"]
+            u["businesses"][b] = time.time()
+    if total > 0: 
+        u["coins"] += total
+        save_db()
+        bot.answer_callback_query(call.id, f"✅ {total}!")
+    else: 
+        bot.answer_callback_query(call.id, "⏳ Пусто.")
+
+# Обновляем меню /, чтобы там появились магазин и бизнес
+def update_menu_patch():
+    cmds = [
+        BotCommand("start", "Старт"), BotCommand("help", "Справка"),
+        BotCommand("profile", "Профиль"), BotCommand("top", "Топ"),
+        BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"),
+        BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"),
+        BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"),
+        BotCommand("casino", "Казино"), BotCommand("achieves", "Ачивки"),
+        BotCommand("save", "Сохранить")
+    ]
+    bot.set_my_commands(cmds)
+
+update_menu_patch()
