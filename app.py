@@ -231,3 +231,19 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+@bot.message_handler(commands=['wipe_group'])
+def wipe_group(msg):
+    if msg.from_user.id != OWNER_ID: return
+    to_delete = []
+    for uid, data in users.items():
+        name = str(data.get("name", "")).lower()
+        if "group" in name or "группа" in name:
+            to_delete.append(uid)
+    
+    if not to_delete:
+        return bot.reply_to(msg, "❌ Не нашел никого с именем 'Group' или 'Группа'.")
+        
+    for uid in to_delete:
+        del users[uid]
+    save_db()
+    bot.reply_to(msg, f"🧹 Удалено из базы: {len(to_delete)} шт. (ID: {', '.join(to_delete)})")
