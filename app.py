@@ -274,23 +274,21 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 # ========== ПАТЧ: ВОЗВРАЩАЕМ АНТИДОТ, ГИФТ, РАССЫЛКИ ==========
-
-# 1. Возвращаем Антидот в магазин
+# ========== НОВЫЙ МАГАЗИН С АНТИДОТОМ ==========
 @bot.message_handler(commands=['shop'])
-def shop_patch(msg):
+def shop_new(msg):
     m = types.InlineKeyboardMarkup(row_width=1)
-    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"))
-    m.add(types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"))
-    m.add(types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"))
-    m.add(types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), 
+          types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), 
+          types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), 
+          types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
     bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data == "buy_antidote")
-def buy_antidote_patch(call):
+def buy_antidote_new(call):
     u = get_u(call.from_user.id)
     if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало монет!")
     u["coins"] -= 500
-    if "virus_until" in u: u["virus_until"] = 0
     save_db()
     bot.answer_callback_query(call.id, "💊 Ты вылечился!")
 
