@@ -11,12 +11,15 @@ CHAT_ID = -1004215885788
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 users, boss_hp, pending_messages = {}, 10000, {}
+market_item = {"name": None, "price": 0, "time": 0}
 
 def get_u(uid, name=None):
     uid_str = str(uid)
     if uid_str not in users:
-        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "dmg": 10, "name": name or "Игрок", "last_loan": 0, "last_rob": 0, "bank_deposit": 0, "bank_time": 0, "achieves": [], "last_boss_hit": 0, "last_steal": 0, "last_duel": 0}
+        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "dmg": 10, "name": name or "Игрок", "last_loan": 0, "last_rob": 0, "last_steal": 0, "last_duel": 0, "last_boss_hit": 0, "bank_deposit": 0, "bank_time": 0, "businesses": {}, "achieves": []}
     if name: users[uid_str]["name"] = name
+    for k, v in {"businesses": {}, "achieves": [], "last_steal": 0, "last_duel": 0, "bank_deposit": 0}.items():
+        if k not in users[uid_str]: users[uid_str][k] = v
     return users[uid_str]
 
 def save_db():
@@ -44,8 +47,10 @@ def give_achieve(uid, name, reward):
     u = get_u(uid)
     if name not in u["achieves"]:
         u["achieves"].append(name); u["coins"] += reward
-        try: bot.send_message(CHAT_ID, f"🏆 **АЧИВКА!** {u['name']} получил **{name}** (+{reward} монет)!")
+        try: bot.send_message(CHAT_ID, f"🏆 **АЧИВКА!** {u['name']} получил **{name}**!")
         except: pass
+
+BUSINESSES = {"farm": {"name": "🌾 Ферма", "price": 1000, "income": 200, "cooldown": 3600}, "garden": {"name": "🌳 Сад", "price": 3000, "income": 500, "cooldown": 1800}, "factory": {"name": "🏭 Завод", "price": 10000, "income": 2000, "cooldown": 7200}}
 
 def get_target(msg):
     if msg.reply_to_message: return str(msg.reply_to_message.from_user.id), get_u(msg.reply_to_message.from_user.id)
@@ -58,23 +63,25 @@ def get_target(msg):
 
 @bot.message_handler(commands=['start'])
 def start(msg):
-    get_u(msg.from_user.id, msg.from_user.first_name)
-    bot.send_message(msg.from_user.id, "Бот запущен! Пиши /help.", reply_markup=types.ReplyKeyboardRemove())
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if msg.from_user.username: u["username"] = msg.from_user.username
+    give_achieve(msg.from_user.id, "Первые шаги", 100)
+    bot.send_message(msg.from_user.id, "Бот запущен!", reply_markup=types.ReplyKeyboardRemove())
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 /profile /top /bank /loan /rob /boss /casino /achieves /steal /infect /duel /save /give /broadcast /sendchat /reset")
+def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /shop /top /bank /loan /rob /casino /boss /steal /infect /duel /clan /achieves /рулетка /give /broadcast /ban /save")
 
 @bot.message_handler(commands=['loan'])
 def loan(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
-    if u["debt"] > 0: return bot.reply_to(msg, "❌ Сначала верни прошлый долг!")
-    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 Ты взял 1000. Долг: 1500.")
+    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 сек!")
+    if u["debt"] > 0: return bot.reply_to(msg, "❌ Верни долг!")
+    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 +1000. Долг: 1500.")
 
 @bot.message_handler(commands=['rob'])
 def rob(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 секунд!")
+    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10 сек!")
     u["last_rob"] = time.time()
     if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 +300!")
     else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 -{p}")
@@ -84,8 +91,8 @@ def bank(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if u.get("bank_deposit", 0) > 0:
         if time.time() - u.get("bank_time", 0) >= 86400:
-            profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 Вклад закрыт! +{profit}")
-        else: bot.reply_to(msg, "🏦 Жди 24 часа.")
+            profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 +{profit}")
+        else: bot.reply_to(msg, "🏦 Жди 24ч.")
         return
     m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000")); bot.reply_to(msg, "🏦 Банк (20%)", reply_markup=m)
 
@@ -139,6 +146,16 @@ def casino(msg):
     elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
     else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
 
+@bot.message_handler(commands=['рулетка'])
+def roulette(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    parts = msg.text.split()
+    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /рулетка 100")
+    bet = int(parts[1])
+    if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало.")
+    if random.random() > 0.5: u["coins"] += bet * 2; bot.reply_to(msg, f"🎡 x2! +{bet*2}")
+    else: u["coins"] -= bet; bot.reply_to(msg, f"🎡 -{bet}")
+
 @bot.message_handler(commands=['boss'])
 def boss(msg):
     global boss_hp
@@ -148,6 +165,36 @@ def boss(msg):
     if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
     dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2
     bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}.")
+
+@bot.message_handler(commands=['shop'])
+def shop(msg):
+    m = types.InlineKeyboardMarkup(row_width=1)
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"))
+    bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
+def buy_cb(call):
+    u = get_u(call.from_user.id); i = call.data.split("_")[1]
+    p = BUSINESSES[i]["price"]
+    if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
+    u["coins"] -= p; u["businesses"][i] = 0; save_db()
+    bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
+
+@bot.message_handler(commands=['business'])
+def business_menu(msg):
+    u = get_u(msg.from_user.id)
+    if not u["businesses"]: return bot.reply_to(msg, "🏢 Купи в /shop.")
+    text = "🏢 **БИЗНЕС**\n\n"
+    for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
+    m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect")); bot.reply_to(msg, text, reply_markup=m, parse_mode="Markdown")
+
+@bot.callback_query_handler(func=lambda call: call.data == "biz_collect")
+def biz_collect(call):
+    u = get_u(call.from_user.id); total = 0
+    for b, l in list(u["businesses"].items()):
+        if time.time() - l >= BUSINESSES[b]["cooldown"]: total += BUSINESSES[b]["income"]; u["businesses"][b] = time.time()
+    if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ {total}!")
+    else: bot.answer_callback_query(call.id, "⏳ Пусто.")
 
 @bot.message_handler(commands=['top'])
 def top(msg):
@@ -186,26 +233,22 @@ def broadcast(msg):
         except: pass
     bot.reply_to(msg, f"✅ {c} игрокам.")
 
-@bot.message_handler(commands=['sendchat'])
-def sendchat(msg):
+@bot.message_handler(commands=['ban'])
+def ban_user(msg):
     if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/sendchat", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    try: bot.send_message(CHAT_ID, text); bot.reply_to(msg, "✅ Отправлено в чат!")
-    except Exception as e: bot.reply_to(msg, f"❌ {e}")
+    if msg.reply_to_message:
+        target_id = str(msg.reply_to_message.from_user.id)
+        if target_id in users: del users[target_id]; save_db(); bot.reply_to(msg, f"🚫 {target_id} удален!")
+        else: bot.reply_to(msg, "❌ Нет в базе.")
+        return
+    parts = msg.text.split()
+    if len(parts) < 2: return bot.reply_to(msg, "❌ /ban [ID] или Reply")
+    if parts[1] in users: del users[parts[1]]; save_db(); bot.reply_to(msg, f"🚫 {parts[1]} удален!")
+    else: bot.reply_to(msg, "❌ Не найден.")
 
 @bot.message_handler(commands=['save'])
 def save_cmd(msg):
     if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 ОК!")
-
-@bot.message_handler(commands=['reset'])
-def reset_cmd(msg):
-    if msg.from_user.id != OWNER_ID: return
-    parts = msg.text.split()
-    if len(parts) < 2: return bot.reply_to(msg, "❌ /reset @юзер")
-    un = parts[1].replace("@", "").lower()
-    for uid, d in users.items():
-        if d.get("username", "").lower() == un: d["coins"] = 0; save_db(); bot.reply_to(msg, f"🧹 {un} обнулен!"); return
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_msg(msg):
@@ -223,7 +266,7 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")]
+    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("рулетка", "Рулетка"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("save", "Сохранить"), BotCommand("ban", "Забанить")]
     bot.set_my_commands(cmds)
     print("🚀 ЗАПУЩЕН!")
     bot.infinity_polling()
@@ -231,19 +274,3 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-@bot.message_handler(commands=['wipe_group'])
-def wipe_group(msg):
-    if msg.from_user.id != OWNER_ID: return
-    to_delete = []
-    for uid, data in users.items():
-        name = str(data.get("name", "")).lower()
-        if "group" in name or "группа" in name:
-            to_delete.append(uid)
-    
-    if not to_delete:
-        return bot.reply_to(msg, "❌ Не нашел никого с именем 'Group' или 'Группа'.")
-        
-    for uid in to_delete:
-        del users[uid]
-    save_db()
-    bot.reply_to(msg, f"🧹 Удалено из базы: {len(to_delete)} шт. (ID: {', '.join(to_delete)})")
