@@ -272,3 +272,59 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+# ========== ПАТЧ: ВОЗВРАЩАЕМ АНТИДОТ, ГИФТ, РАССЫЛКИ ==========
+
+# 1. Возвращаем Антидот в магазин
+@bot.message_handler(commands=['shop'])
+def shop_patch(msg):
+    m = types.InlineKeyboardMarkup(row_width=1)
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"))
+    m.add(types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"))
+    m.add(types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"))
+    m.add(types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
+    bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
+
+@bot.callback_query_handler(func=lambda call: call.data == "buy_antidote")
+def buy_antidote_patch(call):
+    u = get_u(call.from_user.id)
+    if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало монет!")
+    u["coins"] -= 500
+    if "virus_until" in u: u["virus_until"] = 0
+    save_db()
+    bot.answer_callback_query(call.id, "💊 Ты вылечился!")
+
+# 2. Возвращаем /gift (подарить монеты)
+@bot.message_handler(commands=['gift'])
+def gift_patch(msg):
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    parts = msg.text.split()
+    if len(parts) >= 2 and parts[-1].isdigit():
+        a = int(parts[-1])
+        if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
+        u["coins"] -= a; target["coins"] += a; save_db()
+        bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
+    else: bot.reply_to(msg, "❌ /gift [ID] [Сумма]")
+
+# 3. Возвращаем /broadcast (рассылка в ЛС)
+@bot.message_handler(commands=['broadcast'])
+def broadcast_patch(msg):
+    if msg.from_user.id != OWNER_ID: return
+    text = msg.text.replace("/broadcast", "").strip()
+    if not text: return bot.reply_to(msg, "❌ Пусто.")
+    c = 0
+    for uid in users.keys():
+        try: bot.send_message(int(uid), f"📢 {text}"); c += 1
+        except: pass
+    bot.reply_to(msg, f"✅ {c} игрокам.")
+
+# 4. Возвращаем /sendchat (рассылка в чат)
+@bot.message_handler(commands=['sendchat'])
+def sendchat_patch(msg):
+    if msg.from_user.id != OWNER_ID: return
+    text = msg.text.replace("/sendchat", "").strip()
+    if not text: return bot.reply_to(msg, "❌ Пусто.")
+    try: bot.send_message(CHAT_ID, text); bot.reply_to(msg, "✅ Отправлено в чат!")
+    except Exception as e: bot.reply_to(msg, f"❌ {e}")
