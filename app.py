@@ -74,7 +74,7 @@ def start(msg):
     bot.send_message(msg.from_user.id, "Бот запущен!", reply_markup=types.ReplyKeyboardRemove())
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /shop /top /bank /loan /rob /casino /boss /steal /infect /duel /achieves /save /ban")
+def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /shop /top /bank /loan /rob /casino /boss /steal /infect /duel /achieves /gift /broadcast /sendchat /save /ban")
 
 @bot.message_handler(commands=['loan'])
 def loan(msg):
@@ -164,12 +164,20 @@ def boss(msg):
 @bot.message_handler(commands=['shop'])
 def shop(msg):
     m = types.InlineKeyboardMarkup(row_width=1)
-    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"))
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), 
+          types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), 
+          types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), 
+          types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
     bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
 def buy_cb(call):
     u = get_u(call.from_user.id); i = call.data.split("_")[1]
+    if i == "antidote":
+        if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало!")
+        u["coins"] -= 500
+        save_db()
+        return bot.answer_callback_query(call.id, "💊 Ты вылечился!")
     p = BUSINESSES[i]["price"]
     if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
     u["coins"] -= p
@@ -193,6 +201,38 @@ def biz_collect(call):
         if time.time() - l >= BUSINESSES[b]["cooldown"]: total += BUSINESSES[b]["income"]; u["businesses"][b] = time.time()
     if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ {total}!")
     else: bot.answer_callback_query(call.id, "⏳ Пусто.")
+
+@bot.message_handler(commands=['gift'])
+def gift(msg):
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    parts = msg.text.split()
+    if len(parts) >= 2 and parts[-1].isdigit():
+        a = int(parts[-1])
+        if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
+        u["coins"] -= a; target["coins"] += a; save_db()
+        bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
+    else: bot.reply_to(msg, "❌ /gift [ID] [Сумма]")
+
+@bot.message_handler(commands=['broadcast'])
+def broadcast(msg):
+    if msg.from_user.id != OWNER_ID: return
+    text = msg.text.replace("/broadcast", "").strip()
+    if not text: return bot.reply_to(msg, "❌ Пусто.")
+    c = 0
+    for uid in users.keys():
+        try: bot.send_message(int(uid), f"📢 {text}"); c += 1
+        except: pass
+    bot.reply_to(msg, f"✅ {c} игрокам.")
+
+@bot.message_handler(commands=['sendchat'])
+def sendchat(msg):
+    if msg.from_user.id != OWNER_ID: return
+    text = msg.text.replace("/sendchat", "").strip()
+    if not text: return bot.reply_to(msg, "❌ Пусто.")
+    try: bot.send_message(CHAT_ID, text); bot.reply_to(msg, "✅ Отправлено в чат!")
+    except Exception as e: bot.reply_to(msg, f"❌ {e}")
 
 @bot.message_handler(commands=['top'])
 def top(msg):
@@ -219,17 +259,6 @@ def give(msg):
         if parts[1] in users: users[parts[1]]["coins"] += int(parts[2]); save_db(); bot.reply_to(msg, "💸 Выдано!")
         else: bot.reply_to(msg, "❌ Не найден.")
     else: bot.reply_to(msg, "❌ /give [ID] [Сумма]")
-
-@bot.message_handler(commands=['broadcast'])
-def broadcast(msg):
-    if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/broadcast", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    c = 0
-    for uid in users.keys():
-        try: bot.send_message(int(uid), f"📢 {text}"); c += 1
-        except: pass
-    bot.reply_to(msg, f"✅ {c} игрокам.")
 
 @bot.message_handler(commands=['ban'])
 def ban_user(msg):
@@ -264,7 +293,7 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("save", "Сохранить")]
+    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("gift", "Подарить"), BotCommand("broadcast", "Рассылка"), BotCommand("sendchat", "В чат"), BotCommand("save", "Сохранить")]
     bot.set_my_commands(cmds)
     print("🚀 ЗАПУЩЕН!")
     bot.infinity_polling()
@@ -272,57 +301,3 @@ def run_bot():
 if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-# ========== ПАТЧ: ВОЗВРАЩАЕМ АНТИДОТ, ГИФТ, РАССЫЛКИ ==========
-# ========== НОВЫЙ МАГАЗИН С АНТИДОТОМ ==========
-@bot.message_handler(commands=['shop'])
-def shop_new(msg):
-    m = types.InlineKeyboardMarkup(row_width=1)
-    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), 
-          types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), 
-          types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), 
-          types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
-    bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
-
-@bot.callback_query_handler(func=lambda call: call.data == "buy_antidote")
-def buy_antidote_new(call):
-    u = get_u(call.from_user.id)
-    if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало монет!")
-    u["coins"] -= 500
-    save_db()
-    bot.answer_callback_query(call.id, "💊 Ты вылечился!")
-
-# 2. Возвращаем /gift (подарить монеты)
-@bot.message_handler(commands=['gift'])
-def gift_patch(msg):
-    tid, target = get_target(msg)
-    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    parts = msg.text.split()
-    if len(parts) >= 2 and parts[-1].isdigit():
-        a = int(parts[-1])
-        if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
-        u["coins"] -= a; target["coins"] += a; save_db()
-        bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
-    else: bot.reply_to(msg, "❌ /gift [ID] [Сумма]")
-
-# 3. Возвращаем /broadcast (рассылка в ЛС)
-@bot.message_handler(commands=['broadcast'])
-def broadcast_patch(msg):
-    if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/broadcast", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    c = 0
-    for uid in users.keys():
-        try: bot.send_message(int(uid), f"📢 {text}"); c += 1
-        except: pass
-    bot.reply_to(msg, f"✅ {c} игрокам.")
-
-# 4. Возвращаем /sendchat (рассылка в чат)
-@bot.message_handler(commands=['sendchat'])
-def sendchat_patch(msg):
-    if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/sendchat", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    try: bot.send_message(CHAT_ID, text); bot.reply_to(msg, "✅ Отправлено в чат!")
-    except Exception as e: bot.reply_to(msg, f"❌ {e}")
