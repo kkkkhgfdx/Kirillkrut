@@ -23,9 +23,9 @@ BUSINESSES = {
 def get_u(uid, name=None):
     uid_str = str(uid)
     if uid_str not in users:
-        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "dmg": 10, "name": name or "Игрок", "businesses": {}, "bank_deposit": 0, "bank_time": 0, "achieves": [], "last_loan": 0, "last_rob": 0, "last_steal": 0, "last_duel": 0, "last_boss_hit": 0}
+        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "dmg": 10, "name": name or "Игрок", "businesses": {}, "bank_deposit": 0, "bank_time": 0, "achieves": [], "last_loan": 0, "last_rob": 0, "last_steal": 0, "last_duel": 0, "last_boss_hit": 0, "last_mine": 0, "last_smuggle": 0, "has_chest": False, "last_daily": 0}
     if name: users[uid_str]["name"] = name
-    for k, v in {"businesses": {}, "achieves": [], "last_steal": 0, "last_duel": 0, "bank_deposit": 0}.items():
+    for k, v in {"businesses": {}, "achieves": [], "last_steal": 0, "last_duel": 0, "bank_deposit": 0, "has_chest": False}.items():
         if k not in users[uid_str]: users[uid_str][k] = v
     return users[uid_str]
 
@@ -71,10 +71,37 @@ def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if msg.from_user.username: u["username"] = msg.from_user.username
     give_achieve(msg.from_user.id, "Первые шаги", 100)
-    bot.send_message(msg.from_user.id, "Бот запущен!", reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(msg.from_user.id, "Синдикат 60.0 ПРАЙМ запущен! Пиши /help.", reply_markup=types.ReplyKeyboardRemove())
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 /profile /business /shop /top /bank /loan /rob /casino /boss /steal /infect /duel /achieves /gift /broadcast /sendchat /save /ban")
+def help_cmd(msg): bot.reply_to(msg, "📋 /profile /top /shop /business /bank /loan /rob /boss /casino /mine /smuggle /steal /infect /duel /achieves /daily /save")
+
+@bot.message_handler(commands=['mine'])
+def mine(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_mine", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
+    u["last_mine"] = time.time()
+    res = random.random()
+    if res > 0.8: w = 1000; u["coins"] += w; bot.reply_to(msg, f"💎 Ты нашел АЛМАЗ! +{w} монет!")
+    elif res > 0.4: w = 300; u["coins"] += w; bot.reply_to(msg, f"🪙 Ты нашел Золото! +{w} монет!")
+    elif res > 0.1: w = 50; u["coins"] += w; bot.reply_to(msg, f"⛏ Уголь... +{w} монет.")
+    else: w = min(200, u["coins"]); u["coins"] -= w; bot.reply_to(msg, f"💥 Шахта обвалилась! Ты потерял {w} монет.")
+
+@bot.message_handler(commands=['smuggle'])
+def smuggle(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно 1000 монет.")
+    if random.random() > 0.5:
+        u["coins"] += 3000; bot.reply_to(msg, "🕵️ Сделка прошла! Ты получил 3000 монет!")
+    else:
+        u["coins"] -= 1000; bot.reply_to(msg, "🚔 Тебя поймали! Потеряно 1000 монет.")
+
+@bot.message_handler(commands=['daily'])
+def daily(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Раз в сутки!")
+    u["last_daily"] = time.time(); u["has_chest"] = True
+    bot.reply_to(msg, "🎁 Ты получил Ежедневный Кейс! Открой его в /shop.")
 
 @bot.message_handler(commands=['loan'])
 def loan(msg):
@@ -167,23 +194,29 @@ def shop(msg):
     m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), 
           types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), 
           types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), 
-          types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
+          types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"),
+          types.InlineKeyboardButton("🎁 Открыть Кейс", callback_data="open_chest"))
     bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("buy_") or call.data == "open_chest")
 def buy_cb(call):
-    u = get_u(call.from_user.id); i = call.data.split("_")[1]
+    u = get_u(call.from_user.id)
+    if call.data == "open_chest":
+        if not u.get("has_chest"): return bot.answer_callback_query(call.id, "❌ Нет кейса. Получи в /daily!")
+        u["has_chest"] = False
+        if random.random() > 0.5: u["coins"] += 2000; bot.answer_callback_query(call.id, "✅ +2000 монет из кейса!")
+        else: u["dmg"] += 5; bot.answer_callback_query(call.id, "✅ +5 к урону навсегда!")
+        save_db(); return
+    
+    i = call.data.split("_")[1]
     if i == "antidote":
         if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало!")
-        u["coins"] -= 500
-        save_db()
-        return bot.answer_callback_query(call.id, "💊 Ты вылечился!")
+        u["coins"] -= 500; save_db(); return bot.answer_callback_query(call.id, "💊 Вылечился!")
     p = BUSINESSES[i]["price"]
     if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
     u["coins"] -= p
     if "businesses" not in u: u["businesses"] = {}
-    u["businesses"][i] = 0
-    save_db()
+    u["businesses"][i] = 0; save_db()
     bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
 
 @bot.message_handler(commands=['business'])
@@ -202,38 +235,6 @@ def biz_collect(call):
     if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ {total}!")
     else: bot.answer_callback_query(call.id, "⏳ Пусто.")
 
-@bot.message_handler(commands=['gift'])
-def gift(msg):
-    tid, target = get_target(msg)
-    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    parts = msg.text.split()
-    if len(parts) >= 2 and parts[-1].isdigit():
-        a = int(parts[-1])
-        if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
-        u["coins"] -= a; target["coins"] += a; save_db()
-        bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
-    else: bot.reply_to(msg, "❌ /gift [ID] [Сумма]")
-
-@bot.message_handler(commands=['broadcast'])
-def broadcast(msg):
-    if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/broadcast", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    c = 0
-    for uid in users.keys():
-        try: bot.send_message(int(uid), f"📢 {text}"); c += 1
-        except: pass
-    bot.reply_to(msg, f"✅ {c} игрокам.")
-
-@bot.message_handler(commands=['sendchat'])
-def sendchat(msg):
-    if msg.from_user.id != OWNER_ID: return
-    text = msg.text.replace("/sendchat", "").strip()
-    if not text: return bot.reply_to(msg, "❌ Пусто.")
-    try: bot.send_message(CHAT_ID, text); bot.reply_to(msg, "✅ Отправлено в чат!")
-    except Exception as e: bot.reply_to(msg, f"❌ {e}")
-
 @bot.message_handler(commands=['top'])
 def top(msg):
     s = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True); t = "🏆 **Топ:**\n\n"
@@ -250,28 +251,6 @@ def show_achieves(msg):
     u = get_u(msg.from_user.id)
     if not u["achieves"]: return bot.reply_to(msg, "Нет ачивок.")
     bot.reply_to(msg, "🏆 Ачивки:\n" + "\n".join(u["achieves"]))
-
-@bot.message_handler(commands=['give'])
-def give(msg):
-    if msg.from_user.id != OWNER_ID: return
-    parts = msg.text.split()
-    if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
-        if parts[1] in users: users[parts[1]]["coins"] += int(parts[2]); save_db(); bot.reply_to(msg, "💸 Выдано!")
-        else: bot.reply_to(msg, "❌ Не найден.")
-    else: bot.reply_to(msg, "❌ /give [ID] [Сумма]")
-
-@bot.message_handler(commands=['ban'])
-def ban_user(msg):
-    if msg.from_user.id != OWNER_ID: return
-    if msg.reply_to_message:
-        target_id = str(msg.reply_to_message.from_user.id)
-        if target_id in users: del users[target_id]; save_db(); bot.reply_to(msg, f"🚫 {target_id} удален!")
-        else: bot.reply_to(msg, "❌ Нет в базе.")
-        return
-    parts = msg.text.split()
-    if len(parts) < 2: return bot.reply_to(msg, "❌ /ban [ID] или Reply")
-    if parts[1] in users: del users[parts[1]]; save_db(); bot.reply_to(msg, f"🚫 {parts[1]} удален!")
-    else: bot.reply_to(msg, "❌ Не найден.")
 
 @bot.message_handler(commands=['save'])
 def save_cmd(msg):
@@ -293,9 +272,9 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("gift", "Подарить"), BotCommand("broadcast", "Рассылка"), BotCommand("sendchat", "В чат"), BotCommand("save", "Сохранить")]
+    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("achieves", "Ачивки"), BotCommand("daily", "Бонус"), BotCommand("save", "Сохранить")]
     bot.set_my_commands(cmds)
-    print("🚀 ЗАПУЩЕН!")
+    print("🚀 СИНДИКАТ 60.0 ЗАПУЩЕН!")
     bot.infinity_polling()
 
 if __name__ == "__main__":
