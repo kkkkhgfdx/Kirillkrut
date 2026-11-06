@@ -258,11 +258,10 @@ def callback_handler(call):
     elif call.data == "menu_top":
     s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
     t = "🏆 **Топ богачей:**\n\n"
-    for i, (user_id, d) in enumerate(s[:10], 1): 
-        t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
+    for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
     kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
     bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-# --- СТАРЫЕ КОМАНДЫ ---
+    
 @bot.message_handler(commands=['start'])
 def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
