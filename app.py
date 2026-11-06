@@ -185,7 +185,7 @@ def callback_handler(call):
             del clans[c_id]; save_db()
         bot.answer_callback_query(call.id, "🗑 Клан распущен!", show_alert=True)
         bot.edit_message_text("Клан удален.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-    elif call.data == "menu_biz":
+            elif call.data == "menu_biz":
         if not u.get("businesses"): return bot.answer_callback_query(call.id, "❌ У тебя нет бизнесов!", show_alert=True)
         text = "🏢 **Твои бизнесы**\n\n"
         for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
@@ -256,12 +256,12 @@ def callback_handler(call):
         u["last_daily"] = time.time(); u["has_chest"] = True; save_db()
         bot.answer_callback_query(call.id, "🎁 Ты получил Ежедневный Кейс!", show_alert=True)
     elif call.data == "menu_top":
-    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
-    t = "🏆 **Топ богачей:**\n\n"
-    for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
-    kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-    bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-    
+        s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True); t = "🏆 **Топ богачей:**\n\n"
+        for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+
+# --- СТАРЫЕ КОМАНДЫ ---
 @bot.message_handler(commands=['start'])
 def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
@@ -321,9 +321,8 @@ def mine(msg):
     if res > 0.8: w = 1000; u["coins"] += w; bot.reply_to(msg, f"💎 АЛМАЗ! +{w}!")
     elif res > 0.4: w = 300; u["coins"] += w; bot.reply_to(msg, f"🪙 Золото! +{w}!")
     elif res > 0.1: w = 50; u["coins"] += w; bot.reply_to(msg, f"⛏ Уголь. +{w}.")
-    else: w = min(200, u["coins"]); u["coins"] -= w; bot.reply_to(msg, f"💥 Обвал! -{w}.")
-
-@bot.message_handler(commands=['smuggle'])
+    else: w = min(200, u["coins"]); else: w = min(200, u["coins"]); u["coins"] -= w; bot.reply_to(msg, f"💥 Обвал! -{w}.")
+        @bot.message_handler(commands=['smuggle'])
 def smuggle(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
