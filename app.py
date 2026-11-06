@@ -257,6 +257,10 @@ def start(msg):
     give_achieve(msg.from_user.id, "Первые шаги", 100)
     bot.send_message(msg.from_user.id, "🔥 **Синдикат 71.0: Тёмный Рынок**\nЖми кнопки или пиши /help.", reply_markup=main_kb(msg.from_user.id), parse_mode="Markdown")
 
+@bot.message_handler(commands=['menu'])
+def menu_cmd(msg):
+    bot.send_message(msg.from_user.id, "🚜 **Синдикат 71.0: Тёмный Рынок**\nВыбирай действие:", reply_markup=main_kb(msg.from_user.id), parse_mode="Markdown")
+
 @bot.message_handler(commands=['help'])
 def help_cmd(msg): bot.reply_to(msg, "📋 /profile /top /shop /business /bank /loan /rob /boss /casino /mine /smuggle /steal /infect /duel /duelclub /myclan /clantop /achieves /daily /gift /save /reset /ban")
 
@@ -509,7 +513,7 @@ def handle_msg(msg):
             except: pass
 
 def run_bot():
-    cmds = [BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("duelclub", "Дуэльный Клуб"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("myclan", "Мой Клан"), BotCommand("clantop", "Топ Кланов"), BotCommand("achieves", "Ачивки"), BotCommand("daily", "Бонус"), BotCommand("gift", "Подарить"), BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")]
+    cmds = [BotCommand("menu", "Меню"), BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("duelclub", "Дуэльный Клуб"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("myclan", "Мой Клан"), BotCommand("clantop", "Топ Кланов"), BotCommand("achieves", "Ачивки"), BotCommand("daily", "Бонус"), BotCommand("gift", "Подарить"), BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")]
     bot.set_my_commands(cmds)
     print("🚀 СИНДИКАТ 71.0: ТЁМНЫЙ РЫНОК ЗАПУЩЕН!")
     bot.infinity_polling()
