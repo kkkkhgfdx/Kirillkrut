@@ -12,7 +12,7 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 users, boss_hp, pending_messages = {}, 10000, {}
 duel_club = {"pot": 0, "players": {}}
-clans = {} # Сюда будем сохранять кланы
+clans = {}
 
 BUSINESSES = {
     "farm": {"name": "🌾 Ферма", "price": 1000, "income": 200, "cooldown": 3600},
@@ -31,7 +31,6 @@ def get_u(uid, name=None):
 
 def save_db():
     try:
-        # Сохраняем и юзеров, и кланы
         data = {"users": users, "clans": clans}
         with open("users.json", "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=4)
         with open("users.json", "rb") as f:
@@ -47,11 +46,8 @@ def load_db():
         if chat.pinned_message and chat.pinned_message.document:
             downloaded = bot.download_file(bot.get_file(chat.pinned_message.document.file_id).file_path)
             data = json.loads(downloaded.decode('utf-8'))
-            # Проверяем, есть ли ключи кланов в базе
-            if "users" in data and "clans" in data:
-                users, clans = data["users"], data["clans"]
-            else:
-                users = data # Старая база без кланов
+            if "users" in data and "clans" in data: users, clans = data["users"], data["clans"]
+            else: users = data
             return
     except: pass
     users, clans = {}, {}
@@ -76,144 +72,98 @@ def get_target(msg):
             if data.get("username", "").lower() == un: return uid, data
     return None, None
 
-# ========== ИНЛАЙН МЕНЮ ==========
 def main_kb(uid):
     kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(types.InlineKeyboardButton("👤 Профиль", callback_data="menu_profile"),
-           types.InlineKeyboardButton("🛒 Магазин", callback_data="menu_shop"))
-    kb.add(types.InlineKeyboardButton("🏢 Бизнесы", callback_data="menu_biz"),
-           types.InlineKeyboardButton("🏦 Банк", callback_data="menu_bank"))
-    kb.add(types.InlineKeyboardButton("🐉 Босс", callback_data="menu_boss"),
-           types.InlineKeyboardButton("🎰 Казино", callback_data="menu_casino"))
-    kb.add(types.InlineKeyboardButton("⛏ Шахта", callback_data="menu_mine"),
-           types.InlineKeyboardButton("🕵️ Контрабанда", callback_data="menu_smuggle"))
-    kb.add(types.InlineKeyboardButton("🛡 Кланы", callback_data="menu_clans"),
-           types.InlineKeyboardButton("🏆 Топ", callback_data="menu_top"))
+    kb.add(types.InlineKeyboardButton("👤 Профиль", callback_data="menu_profile"), types.InlineKeyboardButton("🛒 Магазин", callback_data="menu_shop"))
+    kb.add(types.InlineKeyboardButton("🏢 Бизнесы", callback_data="menu_biz"), types.InlineKeyboardButton("🏦 Банк", callback_data="menu_bank"))
+    kb.add(types.InlineKeyboardButton("🐉 Босс", callback_data="menu_boss"), types.InlineKeyboardButton("🎰 Казино", callback_data="menu_casino"))
+    kb.add(types.InlineKeyboardButton("⛏ Шахта", callback_data="menu_mine"), types.InlineKeyboardButton("🕵️ Контрабанда", callback_data="menu_smuggle"))
+    kb.add(types.InlineKeyboardButton("🛡 Кланы", callback_data="menu_clans"), types.InlineKeyboardButton("🏆 Топ", callback_data="menu_top"))
     kb.add(types.InlineKeyboardButton("🎁 Ежедневка", callback_data="menu_daily"))
     return kb
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    global boss_hp
     u = get_u(call.from_user.id, call.from_user.first_name)
     uid = str(call.from_user.id)
-    
-    if call.data == "menu_main":
-        bot.edit_message_text("🚜 **Синдикат 71.0: Тёмный Рынок**\nВыбирай действие:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id), parse_mode="Markdown")
-
+    if call.data == "menu_main": bot.edit_message_text("🚜 **Синдикат 71.0: Тёмный Рынок**\nВыбирай действие:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id), parse_mode="Markdown")
     elif call.data == "menu_profile":
         clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
         text = f"👤 **{u['name']}**\n💰 Баланс: {u['coins']}\n📈 Уровень: {u['lvl']} (DMG: {u['dmg']})\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: **{clan_name}** ({u.get('clan_rank', '-')})\n🏆 Ачивок: {len(u['achieves'])}"
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "menu_shop":
         kb = types.InlineKeyboardMarkup(row_width=1)
         kb.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"), types.InlineKeyboardButton("🎁 Открыть Кейс", callback_data="open_chest"))
         kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("🛒 **Магазин**", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "menu_clans":
         if u.get("clan"):
-            # Если уже в клане
-            c_id = u["clan"]
-            c = clans.get(c_id)
+            c_id = u["clan"]; c = clans.get(c_id)
             if not c: u["clan"] = None; return bot.answer_callback_query(call.id, "❌ Клан удален.", show_alert=True)
-            
-            is_leader = (c["leader"] == uid)
             text = f"🛡 **Клан: {c['name']}**\n👑 Лидер: {users.get(c['leader'], {}).get('name', 'Неизвестен')}\n💰 Банк клана: {c['bank']}\n📈 Репутация: {c['rep']}\n👥 Участников: {len(c['members'])}\n\n"
             kb = types.InlineKeyboardMarkup(row_width=2)
-            if is_leader:
-                kb.add(types.InlineKeyboardButton("⚔️ Рейд на клан", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Распустить", callback_data="clan_disband"))
-            kb.add(types.InlineKeyboardButton("💸 Вложить в банк (1000)", callback_data="clan_deposit"))
-            kb.add(types.InlineKeyboardButton("👥 Участники", callback_data="clan_members"))
-            kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+            if c["leader"] == uid: kb.add(types.InlineKeyboardButton("⚔️ Рейд на клан", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Распустить", callback_data="clan_disband"))
+            kb.add(types.InlineKeyboardButton("💸 Вложить в банк (1000)", callback_data="clan_deposit"), types.InlineKeyboardButton("👥 Участники", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
         else:
-            # Если без клана
             kb = types.InlineKeyboardMarkup(row_width=1)
-            kb.add(types.InlineKeyboardButton("➕ Создать клан (5000 💰)", callback_data="clan_create"))
-            kb.add(types.InlineKeyboardButton("📋 Список кланов", callback_data="clan_list"))
-            kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+            kb.add(types.InlineKeyboardButton("➕ Создать клан (5000 💰)", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список кланов", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
             bot.edit_message_text("🛡 **Кланы**\nТы пока одинок. Создай свою банду или вступи к другим!", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "clan_create":
         if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌ Нужно 5000 монет!", show_alert=True)
-        u["coins"] -= 5000
-        c_id = str(random.randint(10000, 99999))
+        u["coins"] -= 5000; c_id = str(random.randint(10000, 99999))
         while c_id in clans: c_id = str(random.randint(10000, 99999))
         clans[c_id] = {"name": f"Клан_{u['name'][:5]}", "leader": uid, "bank": 0, "rep": 0, "members": [uid]}
         u["clan"] = c_id; u["clan_rank"] = "Лидер"; save_db()
         bot.answer_callback_query(call.id, "✅ Клан создан! Напиши /myclan для управления.", show_alert=True)
-        bot.edit_message_text("🛡 **Клан создан!**\nЗаходи в /myclan, чтобы переименовать его или начать рейды.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-
+        bot.edit_message_text("🛡 **Клан создан!**\nЗаходи в /myclan.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
     elif call.data == "clan_list":
         if not clans: return bot.answer_callback_query(call.id, "❌ Кланов пока нет.", show_alert=True)
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        text = "📋 **Список кланов:**\n\n"
+        kb = types.InlineKeyboardMarkup(row_width=1); text = "📋 **Список кланов:**\n\n"
         for c_id, c in clans.items():
             text += f"🛡 **{c['name']}** (Репа: {c['rep']}, Людей: {len(c['members'])})\n"
             kb.add(types.InlineKeyboardButton(f"Вступить в {c['name']}", callback_data=f"clan_join_{c_id}"))
         kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_clans"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data.startswith("clan_join_"):
         c_id = call.data.split("_")[2]
         if c_id not in clans: return bot.answer_callback_query(call.id, "❌ Клан исчез.", show_alert=True)
         if u.get("clan"): return bot.answer_callback_query(call.id, "❌ Ты уже в клане!", show_alert=True)
         if len(clans[c_id]["members"]) >= 20: return bot.answer_callback_query(call.id, "❌ Клан переполнен (макс 20)!", show_alert=True)
-        u["clan"] = c_id; u["clan_rank"] = "Боец"
-        clans[c_id]["members"].append(uid); save_db()
+        u["clan"] = c_id; u["clan_rank"] = "Боец"; clans[c_id]["members"].append(uid); save_db()
         bot.answer_callback_query(call.id, f"✅ Ты вступил в клан {clans[c_id]['name']}!", show_alert=True)
-
     elif call.data == "clan_deposit":
         if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало монет!", show_alert=True)
         u["coins"] -= 1000; clans[u["clan"]]["bank"] += 1000; save_db()
         bot.answer_callback_query(call.id, "✅ +1000 в банк клана!", show_alert=True)
-
     elif call.data == "clan_members":
-        c = clans[u["clan"]]
-        text = f"👥 **Участники клана {c['name']}:**\n\n"
-        for m_id in c["members"]:
-            m = users.get(m_id, {})
-            text += f"- {m.get('name', 'Игрок')} ({m.get('clan_rank', 'Боец')})\n"
+        c = clans[u["clan"]]; text = f"👥 **Участники клана {c['name']}:**\n\n"
+        for m_id in c["members"]: text += f"- {users.get(m_id, {}).get('name', 'Игрок')} ({users.get(m_id, {}).get('clan_rank', 'Боец')})\n"
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_clans"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "clan_raid_menu":
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        text = "⚔️ **Выбери клан для атаки:**\n(Победа забирает 20% банка врага)\n\n"
-        found = False
+        kb = types.InlineKeyboardMarkup(row_width=1); text = "⚔️ **Выбери клан для атаки:**\n(Победа забирает 20% банка врага)\n\n"; found = False
         for c_id, c in clans.items():
-            if c_id != u["clan"]:
-                kb.add(types.InlineKeyboardButton(f"Атаковать {c['name']} (Банк: {c['bank']})", callback_data=f"clan_attack_{c_id}"))
-                found = True
-        if not found: text = "❌ Других кланов нет. Жди, пока появятся враги!"
+            if c_id != u["clan"]: kb.add(types.InlineKeyboardButton(f"Атаковать {c['name']} (Банк: {c['bank']})", callback_data=f"clan_attack_{c_id}")); found = True
+        if not found: text = "❌ Других кланов нет."
         kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_clans"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data.startswith("clan_attack_"):
         target_id = call.data.split("_")[2]
         if u.get("clan_rank") != "Лидер": return bot.answer_callback_query(call.id, "❌ Только Лидер может рейдить!", show_alert=True)
         if target_id not in clans: return bot.answer_callback_query(call.id, "❌ Клан исчез.", show_alert=True)
-        
         my_clan = clans[u["clan"]]; enemy = clans[target_id]
-        # Сила зависит от репутации + рандом
         my_power = my_clan["rep"] + len(my_clan["members"]) * 10 + random.randint(1, 100)
         enemy_power = enemy["rep"] + len(enemy["members"]) * 10 + random.randint(1, 100)
-        
         if my_power > enemy_power:
-            steal = int(enemy["bank"] * 0.2)
-            if steal < 100: steal = 100 # Минимальный лут
-            enemy["bank"] -= steal
-            my_clan["bank"] += steal
-            my_clan["rep"] += 50
+            steal = max(100, int(enemy["bank"] * 0.2)); enemy["bank"] -= steal; my_clan["bank"] += steal; my_clan["rep"] += 50
             bot.answer_callback_query(call.id, f"🔥 ПОБЕДА! Вы разбили {enemy['name']} и забрали {steal} монет!", show_alert=True)
         else:
-            my_clan["rep"] = max(0, my_clan["rep"] - 20)
-            my_clan["bank"] = max(0, my_clan["bank"] - 200)
-            bot.answer_callback_query(call.id, f"💀 ПОРАЖЕНИЕ! {enemy['name']} отбились. Вы потеряли репутацию и 200 монет.", show_alert=True)
+            my_clan["rep"] = max(0, my_clan["rep"] - 20); my_clan["bank"] = max(0, my_clan["bank"] - 200)
+            bot.answer_callback_query(call.id, f"💀 ПОРАЖЕНИЕ! Вы потеряли репутацию и 200 монет.", show_alert=True)
         save_db()
-
     elif call.data == "clan_disband":
         if u.get("clan_rank") != "Лидер": return bot.answer_callback_query(call.id, "❌ Только Лидер!", show_alert=True)
         c_id = u["clan"]
@@ -223,22 +173,18 @@ def callback_handler(call):
             del clans[c_id]; save_db()
         bot.answer_callback_query(call.id, "🗑 Клан распущен!", show_alert=True)
         bot.edit_message_text("Клан удален.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-
-    # ... (Остальные меню: Бизнесы, Банк, Босс, Казино, Шахта, Контрабанда, Топ, Ежедневка)
     elif call.data == "menu_biz":
-        if not u.get("businesses"): return bot.answer_callback_query(call.id, "❌ У тебя нет бизнесов! Купи в магазине.", show_alert=True)
+        if not u.get("businesses"): return bot.answer_callback_query(call.id, "❌ У тебя нет бизнесов!", show_alert=True)
         text = "🏢 **Твои бизнесы**\n\n"
         for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("💰 Собрать всё", callback_data="biz_collect")).add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "biz_collect":
         total = 0
         for b, l in list(u["businesses"].items()):
             if time.time() - l >= BUSINESSES[b]["cooldown"]: total += BUSINESSES[b]["income"]; u["businesses"][b] = time.time()
         if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ Собрано: {total} монет!", show_alert=True)
         else: bot.answer_callback_query(call.id, "⏳ Пока пусто.", show_alert=True)
-
     elif call.data == "menu_bank":
         if u.get("bank_deposit", 0) > 0:
             if time.time() - u.get("bank_time", 0) >= 86400:
@@ -248,49 +194,37 @@ def callback_handler(call):
         else:
             kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
             bot.edit_message_text("🏦 **Банк (20% в сутки)**", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "bank_1000":
         if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
         u["coins"] -= 1000; u["bank_deposit"] = 1000; u["bank_time"] = time.time(); save_db()
         bot.answer_callback_query(call.id, "✅ Вложено!")
-
     elif call.data == "menu_boss":
-        global boss_hp
         text = f"🐉 **БОСС: ДРЕВНИЙ ДРАКОН**\n❤️ HP: {boss_hp}/10000\n\nБей его и получай монеты!"
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("⚔️ Ударить", callback_data="hit_boss")).add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "hit_boss":
-        global boss_hp
         if time.time() - u.get("last_boss_hit", 0) < 2: return bot.answer_callback_query(call.id, "❌ Жди 2 сек.", show_alert=True)
         u["last_boss_hit"] = time.time()
         if boss_hp <= 0: boss_hp = 10000; return bot.answer_callback_query(call.id, "🐉 Новый босс!", show_alert=True)
         dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2; save_db()
         bot.answer_callback_query(call.id, f"⚔️ Ты нанес {dmg} урона! Боссу осталось {boss_hp} HP.", show_alert=True)
-        
     elif call.data == "menu_casino":
         kb = types.InlineKeyboardMarkup(row_width=2)
-        kb.add(types.InlineKeyboardButton("🎰 Слоты (100)", callback_data="casino_slots"), types.InlineKeyboardButton("🎡 Рулетка (1000)", callback_data="casino_roulette"))
-        kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        kb.add(types.InlineKeyboardButton("🎰 Слоты (100)", callback_data="casino_slots"), types.InlineKeyboardButton("🎡 Рулетка (1000)", callback_data="casino_roulette")).add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("🎰 **Казино**\nВыбирай игру:", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
     elif call.data == "casino_slots":
         bet = 100
         if u["coins"] < bet: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
-        u["coins"] -= bet; save_db()
-        bot.send_dice(call.message.chat.id, emoji="🎰")
-        time.sleep(2)
+        u["coins"] -= bet; save_db(); bot.send_dice(call.message.chat.id, emoji="🎰"); time.sleep(2)
         if random.random() > 0.8: u["coins"] += bet * 5; bot.send_message(call.message.chat.id, f"🎰 ДЖЕКПОТ! +{bet*5}")
         elif random.random() > 0.5: u["coins"] += bet; bot.send_message(call.message.chat.id, f"🎰 +{bet}")
         else: bot.send_message(call.message.chat.id, f"🎰 -{bet}")
-
     elif call.data == "casino_roulette":
         bet = 1000
         if u["coins"] < bet: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
         u["coins"] -= bet; save_db()
         if random.random() > 0.5: u["coins"] += bet * 3; bot.answer_callback_query(call.id, f"🔥 РУЛЕТКА! Ты выиграл {bet*3}!", show_alert=True)
         else: bot.answer_callback_query(call.id, f"💀 Ты проиграл {bet}!", show_alert=True)
-
     elif call.data == "menu_mine":
         if time.time() - u.get("last_mine", 0) < 60: return bot.answer_callback_query(call.id, "❌ Жди минуту.", show_alert=True)
         u["last_mine"] = time.time(); res = random.random()
@@ -299,27 +233,23 @@ def callback_handler(call):
         elif res > 0.1: w = 50; u["coins"] += w; bot.answer_callback_query(call.id, f"⛏ Уголь. +{w}.", show_alert=True)
         else: w = min(200, u["coins"]); u["coins"] -= w; bot.answer_callback_query(call.id, f"💥 Обвал! -{w}.", show_alert=True)
         save_db()
-
     elif call.data == "menu_smuggle":
         if time.time() - u.get("last_smuggle", 0) < 60: return bot.answer_callback_query(call.id, "❌ Куда погнал? Жди минуту.", show_alert=True)
         if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Нужно 1000.", show_alert=True)
         u["last_smuggle"] = time.time(); save_db()
         if random.random() > 0.5: u["coins"] += 3000; bot.answer_callback_query(call.id, "🕵️ Сделка прошла! +3000.", show_alert=True)
         else: u["coins"] -= 1000; bot.answer_callback_query(call.id, "🚔 Поймали! -1000.", show_alert=True)
-
     elif call.data == "menu_daily":
         if time.time() - u.get("last_daily", 0) < 86400: return bot.answer_callback_query(call.id, "❌ Раз в сутки!", show_alert=True)
         u["last_daily"] = time.time(); u["has_chest"] = True; save_db()
         bot.answer_callback_query(call.id, "🎁 Ты получил Ежедневный Кейс!", show_alert=True)
-
     elif call.data == "menu_top":
         s = sorted(users.items(), key=lambda x: x[1]["coins"], reverse=True); t = "🏆 **Топ богачей:**\n\n"
         for i, (uid, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d['coins']} 💰\n"
-        kb = types.InlineKeyboar
-        rdMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
 
-# ========== СТАРЫЕ КОМАНДЫ (СЖАТЫ ДЛЯ ЭКОНОМИИ МЕСТА) ==========
+# --- СТАРЫЕ КОМАНДЫ ---
 @bot.message_handler(commands=['start'])
 def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
@@ -328,13 +258,12 @@ def start(msg):
     bot.send_message(msg.from_user.id, "🔥 **Синдикат 71.0: Тёмный Рынок**\nЖми кнопки или пиши /help.", reply_markup=main_kb(msg.from_user.id), parse_mode="Markdown")
 
 @bot.message_handler(commands=['help'])
-def help_cmd(msg): bot.reply_to(msg, "📋 **Команды:**\n/profile /top /shop /business /bank /loan /rob /boss /casino /mine /smuggle /steal /infect /duel /duelclub /myclan /clantop /achieves /daily /gift /save /reset /ban")
+def help_cmd(msg): bot.reply_to(msg, "📋 /profile /top /shop /business /bank /loan /rob /boss /casino /mine /smuggle /steal /infect /duel /duelclub /myclan /clantop /achieves /daily /gift /save /reset /ban")
 
 @bot.message_handler(commands=['myclan'])
 def myclan_cmd(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    uid = str(msg.from_user.id)
-    if not u.get("clan"): return bot.reply_to(msg, "🛡 У тебя нет клана. Зайди в меню (кнопка 'Кланы').")
+    u = get_u(msg.from_user.id, msg.from_user.first_name); uid = str(msg.from_user.id)
+    if not u.get("clan"): return bot.reply_to(msg, "🛡 У тебя нет клана. Зайди в меню.")
     c_id = u["clan"]; c = clans.get(c_id)
     if not c: return bot.reply_to(msg, "❌ Твой клан был удален.")
     text = f"🛡 **Клан: {c['name']}**\n👑 Лидер: {users.get(c['leader'], {}).get('name', 'Неизвестен')}\n💰 Банк: {c['bank']}\n📈 Репутация: {c['rep']}\n👥 Участников: {len(c['members'])}\n"
@@ -347,8 +276,8 @@ def myclan_cmd(msg):
 def clantop_cmd(msg):
     if not clans: return bot.reply_to(msg, "❌ Кланов пока нет.")
     s = sorted(clans.items(), key=lambda x: (x[1]["rep"], x[1]["bank"]), reverse=True)
-    t = "🏆 **Топ кланов (по репутации):**\n\n"
-    for i, (cid, c) in enumerate(s[:10], 1): t += f"{i}. 🛡 **{c['name']}**\n   📈 Репа: {c['rep']} | 💰 Банк: {c['bank']} | 👥 {len(c['members'])} чел.\n"
+    t = "🏆 **Топ кланов:**\n\n"
+    for i, (cid, c) in enumerate(s[:10], 1): t += f"{i}. 🛡 **{c['name']}**\n   📈 Репа: {c['rep']} | 💰 Банк: {c['bank']} | 👥 {len(c['members'])}\n"
     bot.reply_to(msg, t, parse_mode="Markdown")
 
 @bot.message_handler(commands=['mine'])
@@ -364,25 +293,23 @@ def mine(msg):
 @bot.message_handler(commands=['smuggle'])
 def smuggle(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Куда погнал? Жди минуту.")
+    if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
     if u["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно 1000.")
     u["last_smuggle"] = time.time()
-    if random.random() > 0.5: u["coins"] += 3000; bot.reply_to(msg, "🕵️ Сделка прошла! +3000.")
-    else: u["coins"] -= 1000; bot.reply_to(msg, "🚔 Поймали! -1000.")
+    if random.random() > 0.5: u["coins"] += 3000; bot.reply_to(msg, "🕵️ +3000.")
+    else: u["coins"] -= 1000; bot.reply_to(msg, "🚔 -1000.")
 
 @bot.message_handler(commands=['duelclub'])
 def duelclub(msg):
     global duel_club
     u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if u["coins"] < 500: return bot.reply_to(msg, "❌ Ставка 500 монет.")
+    if u["coins"] < 500: return bot.reply_to(msg, "❌ Ставка 500.")
     if str(msg.from_user.id) in duel_club["players"]: return bot.reply_to(msg, "❌ Ты уже в клубе.")
     u["coins"] -= 500; duel_club["pot"] += 500; duel_club["players"][str(msg.from_user.id)] = u["name"]
-    bot.reply_to(msg, f"⚔️ Ты в клубе! Банк: {duel_club['pot']} монет. Ждем других...")
+    bot.reply_to(msg, f"⚔️ Ты в клубе! Банк: {duel_club['pot']}. Ждем...")
     if len(duel_club["players"]) >= 3:
         winner_id = random.choice(list(duel_club["players"].keys())); winner_name = duel_club["players"][winner_id]
-        get_u(winner_id)["coins"] += duel_club["pot"]
-        bot.send_message(CHAT_ID, f"🏆 **ДУЭЛЬНЫЙ КЛУБ ЗАВЕРШЕН!**\nПобедитель: {winner_name} и забирает {duel_club['pot']} монет!")
-        duel_club = {"pot": 0, "players": {}}
+        get_u(winner_id)["coins"] += duel_club["pot"]; bot.send_message(CHAT_ID, f"🏆 **КЛУБ:** {winner_name} забирает {duel_club['pot']}!"); duel_club = {"pot": 0, "players": {}}
 
 @bot.message_handler(commands=['loan'])
 def loan(msg):
@@ -403,8 +330,7 @@ def rob(msg):
 def bank(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if u.get("bank_deposit", 0) > 0:
-        if time.time() - u.get("bank_time", 0) >= 86400:
-            profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 +{profit}")
+        if time.time() - u.get("bank_time", 0) >= 86400: profit = int(u["bank_deposit"] * 1.2); u["coins"] += profit; u["bank_deposit"] = 0; bot.reply_to(msg, f"🏦 +{profit}")
         else: bot.reply_to(msg, "🏦 Жди 24ч.")
         return
     m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000")); bot.reply_to(msg, "🏦 Банк (20%)", reply_markup=m)
