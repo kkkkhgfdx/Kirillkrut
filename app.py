@@ -266,15 +266,30 @@ def help_cmd(msg): bot.reply_to(msg, "📋 /profile /top /shop /business /bank /
 
 @bot.message_handler(commands=['myclan'])
 def myclan_cmd(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name); uid = str(msg.from_user.id)
-    if not u.get("clan"): return bot.reply_to(msg, "🛡 У тебя нет клана. Зайди в меню.")
-    c_id = u["clan"]; c = clans.get(c_id)
-    if not c: return bot.reply_to(msg, "❌ Твой клан был удален.")
-    text = f"🛡 **Клан: {c['name']}**\n👑 Лидер: {users.get(c['leader'], {}).get('name', 'Неизвестен')}\n💰 Банк: {c['bank']}\n📈 Репутация: {c['rep']}\n👥 Участников: {len(c['members'])}\n"
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    uid = str(msg.from_user.id)
+    
+    if not u.get("clan"): 
+        return bot.reply_to(msg, "🛡 У тебя нет клана. Зайди в меню (кнопка 'Кланы').")
+        
+    c_id = str(u["clan"]) 
+    c = clans.get(c_id)
+    
+    if not c: 
+        u["clan"] = None
+        return bot.reply_to(msg, "❌ Твой клан был удален.")
+        
+    leader_id = str(c["leader"])
+    leader_name = users.get(leader_id, {}).get('name', 'Неизвестен')
+    
+    text = f"🛡 **Клан: {c['name']}**\n👑 Лидер: {leader_name}\n💰 Банк: {c['bank']}\n📈 Репутация: {c['rep']}\n👥 Участников: {len(c['members'])}\n"
+    
     kb = types.InlineKeyboardMarkup(row_width=1)
-    if c["leader"] == uid: kb.add(types.InlineKeyboardButton("⚔️ Рейд на клан", callback_data="clan_raid_menu"))
+    if leader_id == uid: 
+        kb.add(types.InlineKeyboardButton("⚔️ Рейд на клан", callback_data="clan_raid_menu"))
     kb.add(types.InlineKeyboardButton("👥 Участники", callback_data="clan_members"))
     bot.reply_to(msg, text, reply_markup=kb, parse_mode="Markdown")
+
 
 @bot.message_handler(commands=['clantop'])
 def clantop_cmd(msg):
