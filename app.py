@@ -256,15 +256,12 @@ def callback_handler(call):
         u["last_daily"] = time.time(); u["has_chest"] = True; save_db()
         bot.answer_callback_query(call.id, "🎁 Ты получил Ежедневный Кейс!", show_alert=True)
     elif call.data == "menu_top":
-    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True); t = "🏆 **Топ богачей:**\n\n"
-    for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
+    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
+    t = "🏆 **Топ богачей:**\n\n"
+    for i, (user_id, d) in enumerate(s[:10], 1): 
+        t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
     kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
     bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-                   se=True); t = "🏆 **Топ богачей:**\n\n"
-        for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
-        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
-
 # --- СТАРЫЕ КОМАНДЫ ---
 @bot.message_handler(commands=['start'])
 def start(msg):
