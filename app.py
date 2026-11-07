@@ -93,8 +93,7 @@ def callback_handler(call):
     
     if call.data == "menu_main": 
       if call.data.startswith("buy_") or call.data == "open_chest":
-            if call.message.reply_to_message and call.message.reply_to_message.from_user.id != call.from_user.id: 
-        return bot.answer_callback_query(call.id, "❌ Меню не твое!", show_alert=True)
+         
         
     if call.data == "open_chest":
         u["has_chest"] = False; save_db()
