@@ -93,8 +93,7 @@ def callback_handler(call):
     
     if call.data == "menu_main": 
         if call.data.startswith("buy_") or call.data == "open_chest":
-        if call.message.reply_to_message and call.message.reply_to_message.from_user.id != call.from_user.id:
-        return bot.answer_callback_query(call.id, "❌ Это меню не твое!", show_alert=True)
+        if call.message.reply_to_message and call.message.reply_to_message.from_user.id != call.from_user.id: return bot.answer_callback_query(call.id, "❌ Меню не твое!", show_alert=True)
     
     if call.data == "open_chest":
         if not u.get("has_chest"): return bot.answer_callback_query(call.id, "❌ Нет кейса.")
@@ -108,9 +107,9 @@ def callback_handler(call):
     if i == "antidote":
         if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
         u["coins"] -= 500; save_db(); return bot.answer_callback_query(call.id, "💊 ОК!")
-      
+        
     p = BUSINESSES[i]["price"]
-    if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало денег!")
+    if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
     u["coins"] -= p
     if "businesses" not in u: u["businesses"] = {}
     u["businesses"][i] = time.time() - BUSINESSES[i]["cooldown"]
