@@ -100,7 +100,7 @@ def callback_handler(call):
       if call.data.startswith("buy_"):
         i = call.data.split("_")[1]
     if i == "antidote": 
-    u["coins"] -= 500; save_db()
+       u["coins"] -= 500; save_db()
     return bot.answer_callback_query(call.id, "💊 ОК!")
     p = BUSINESSES[i]["price"]
     if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
