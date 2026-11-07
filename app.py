@@ -322,7 +322,7 @@ def rob(msg):
     if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10с.")
     u["last_rob"] = time.time()
     if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 +300!")
-        else: 
+    else: 
         p = min(200, u["coins"])
         u["coins"] -= p
         bot.reply_to(msg, f"🚔 -{p}")
@@ -331,12 +331,12 @@ def rob(msg):
 def bank(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if u.get("bank_deposit", 0) > 0:
-        if time.time() - u.get("bank_time", 0) >= 86400: 
+    if time.time() - u.get("bank_time", 0) >= 86400: 
             profit = int(u["bank_deposit"] * 1.2)
             u["coins"] += profit
             u["bank_deposit"] = 0
             bot.reply_to(msg, f"🏦 +{profit}")
-        else: 
+    else: 
             bot.reply_to(msg, "🏦 Жди 24ч.")
         return
     m = types.InlineKeyboardMarkup()
@@ -405,7 +405,7 @@ def casino(msg):
     elif res >= 32: 
         u["coins"] += bet
         bot.reply_to(msg, f"🎰 +{bet}")
-    else: 
+     else: 
         u["coins"] -= bet
         bot.reply_to(msg, f"🎰 -{bet}")
 
@@ -445,7 +445,7 @@ def buy_cb(call):
         return
     i = call.data.split("_")[1]
     if i == "antidote":
-        if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
+    if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
         u["coins"] -= 500
         save_db()
         return bot.answer_callback_query(call.id, "💊 ОК!")
