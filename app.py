@@ -109,7 +109,7 @@ def callback_handler(call):
     return
 
     bot.edit_message_text("🚜 **Синдикат 73.0**\nВыбирай:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
-    elif call.data == "menu_profile":
+        elif call.data == "menu_profile":
         clan_name = "Нет"
         if u.get("clan") and str(u["clan"]) in clans: clan_name = clans[str(u["clan"])].get("name", "Нет")
         text = f"👤 **{u['name']}**\n💰 Монеты: {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n📈 Уровень: {u['lvl']} (DMG: {u['dmg']})\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: **{clan_name}**\n🏆 Ачивок: {len(u['achieves'])}"
