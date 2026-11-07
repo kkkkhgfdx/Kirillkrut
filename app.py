@@ -92,30 +92,30 @@ def callback_handler(call):
     uid = str(call.from_user.id)
     
     if call.data == "menu_main": 
-        if call.data.startswith("buy_") or call.data == "open_chest":
-        if call.message.reply_to_message and call.message.reply_to_message.from_user.id != call.from_user.id: return bot.answer_callback_query(call.id, "❌ Меню не твое!", show_alert=True)
-    
+      if call.data.startswith("buy_") or call.data == "open_chest":
+            if call.message.reply_to_message and call.message.reply_to_message.from_user.id != call.from_user.id: 
+        return bot.answer_callback_query(call.id, "❌ Меню не твое!", show_alert=True)
+        
     if call.data == "open_chest":
-        if not u.get("has_chest"): return bot.answer_callback_query(call.id, "❌ Нет кейса.")
-        u["has_chest"] = False
+        u["has_chest"] = False; save_db()
         if random.random() > 0.5: u["coins"] += 2000; bot.answer_callback_query(call.id, "✅ +2000!")
         else: u["dmg"] += 5; bot.answer_callback_query(call.id, "✅ +5 урона!")
-        save_db()
         return
         
     i = call.data.split("_")[1]
-    if i == "antidote":
-        if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
-        u["coins"] -= 500; save_db(); return bot.answer_callback_query(call.id, "💊 ОК!")
+    if i == "antidote": 
+        u["coins"] -= 500; save_db()
+        return bot.answer_callback_query(call.id, "💊 ОК!")
         
     p = BUSINESSES[i]["price"]
     if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало!")
+    
     u["coins"] -= p
     if "businesses" not in u: u["businesses"] = {}
     u["businesses"][i] = time.time() - BUSINESSES[i]["cooldown"]
     save_db()
     bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
-    return
+    return 
         bot.edit_message_text("🚜 **Синдикат 73.0**\nВыбирай:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id), parse_mode="Markdown")
     elif call.data == "menu_profile":
         clan_name = "Нет"
