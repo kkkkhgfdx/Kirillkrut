@@ -109,11 +109,11 @@ def callback_handler(call):
             kb = types.InlineKeyboardMarkup(row_width=2)
             if leader_id == uid: kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Удалить", callback_data="clan_disband"))
             kb.add(types.InlineKeyboardButton("💸 Вложить 1000", callback_data="clan_deposit"), types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb)
         else:
             kb = types.InlineKeyboardMarkup(row_width=1)
             kb.add(types.InlineKeyboardButton("➕ Создать (5000 💰)", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-            bot.edit_message_text("🛡 **Кланы**\nСоздай банду или вступи!", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+            bot.edit_message_text("🛡 **Кланы**\nСоздай банду или вступи!", call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "clan_create":
         if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌ Нужно 5000!", show_alert=True)
         u["coins"] -= 5000; c_id = str(random.randint(10000, 99999))
@@ -261,7 +261,7 @@ def myclan_cmd(msg):
     kb = types.InlineKeyboardMarkup()
     if leader_id == str(msg.from_user.id): kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"))
     kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"))
-    bot.reply_to(msg, text, reply_markup=kb, parse_mode="Markdown")
+    bot.reply_to(msg, text, reply_markup=kb)
 
 @bot.message_handler(commands=['clantop'])
 def clantop_cmd(msg):
@@ -269,7 +269,7 @@ def clantop_cmd(msg):
     s = sorted(clans.items(), key=lambda x: (x[1].get("rep", 0), x[1].get("bank", 0)), reverse=True)
     t = "🏆 **Топ кланов:**\n\n"
     for i, (cid, c) in enumerate(s[:10], 1): t += f"{i}. 🛡 **{c.get('name')}** | Репа: {c.get('rep', 0)} | 💰 {c.get('bank', 0)}\n"
-    bot.reply_to(msg, t, parse_mode="Markdown")
+    bot.reply_to(msg, t)
 
 @bot.message_handler(commands=['paydebt'])
 def paydebt_cmd(msg):
