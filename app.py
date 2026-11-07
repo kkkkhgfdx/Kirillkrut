@@ -331,12 +331,11 @@ def rob(msg):
 def bank(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if u.get("bank_deposit", 0) > 0:
-    if time.time() - u.get("bank_time", 0) >= 86400: 
-            profit = int(u["bank_deposit"] * 1.2)
-            u["coins"] += profit
-            u["bank_deposit"] = 0
-            bot.reply_to(msg, f"🏦 +{profit}")
-    else: 
+        if time.time() - u.get("bank_time", 0) >= 86400: 
+                u["coins"] += int(u["bank_deposit"] * 1.2)
+                u["bank_deposit"] = 0
+                bot.reply_to(msg, f"🏦 Банк начислил проценты!")
+        else: 
             bot.reply_to(msg, "🏦 Жди 24ч.")
         return
     m = types.InlineKeyboardMarkup()
@@ -350,14 +349,8 @@ def steal(msg):
     tid, target = get_target(msg)
     if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
     u["last_steal"] = time.time()
-    if random.random() > 0.4: 
-        s = min(500, target["coins"])
-        target["coins"] -= s
-        u["coins"] += s
-        bot.reply_to(msg, f"🥷 Украл {s}!")
-    else: 
-        u["coins"] -= min(300, u["coins"])
-        bot.reply_to(msg, "🚔 Поймали!")
+    if random.random() > 0.4: s = min(500, target["coins"]); target["coins"] -= s; u["coins"] += s; bot.reply_to(msg, f"🥷 Украл {s}!")
+    else: u["coins"] -= min(300, u["coins"]); bot.reply_to(msg, "🚔 Поймали!")
 
 @bot.message_handler(commands=['infect'])
 def infect(msg):
@@ -366,9 +359,7 @@ def infect(msg):
     if tid == str(msg.from_user.id): return bot.reply_to(msg, "❌ Себя нельзя.")
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if u["coins"] < 300: return bot.reply_to(msg, "❌ Нужно 300.")
-    u["coins"] -= 300
-    target["virus_until"] = time.time() + 3600
-    bot.reply_to(msg, f"🦠 Заразил {target['name']}!")
+    u["coins"] -= 300; target["virus_until"] = time.time() + 3600; bot.reply_to(msg, f"🦠 Заразил {target['name']}!")
 
 @bot.message_handler(commands=['duel'])
 def duel(msg):
@@ -380,14 +371,8 @@ def duel(msg):
     bet = int(msg.text.split()[-1]) if msg.text.split()[-1].isdigit() else 100
     if u["coins"] < bet: return bot.reply_to(msg, "❌ Мало.")
     u["last_duel"] = time.time()
-    if random.random() > 0.5: 
-        u["coins"] += bet
-        target["coins"] -= bet
-        bot.reply_to(msg, f"🤺 Победил {target['name']}!")
-    else: 
-        u["coins"] -= bet
-        target["coins"] += bet
-        bot.reply_to(msg, f"🤺 {target['name']} победил.")
+    if random.random() > 0.5: u["coins"] += bet; target["coins"] -= bet; bot.reply_to(msg, f"🤺 Победил {target['name']}!")
+    else: u["coins"] -= bet; target["coins"] += bet; bot.reply_to(msg, f"🤺 {target['name']} победил.")
 
 @bot.message_handler(commands=['casino'])
 def casino(msg):
@@ -396,18 +381,10 @@ def casino(msg):
     if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /casino 100")
     bet = int(parts[1])
     if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало.")
-    bot.send_dice(msg.chat.id, emoji="🎰")
-    time.sleep(3)
-    res = random.randint(1, 64)
-    if res == 64: 
-        u["coins"] += bet * 5
-        bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
-    elif res >= 32: 
-        u["coins"] += bet
-        bot.reply_to(msg, f"🎰 +{bet}")
-     else: 
-        u["coins"] -= bet
-        bot.reply_to(msg, f"🎰 -{bet}")
+    bot.send_dice(msg.chat.id, emoji="🎰"); time.sleep(3); res = random.randint(1, 64)
+    if res == 64: u["coins"] += bet * 5; bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
+    elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
+    else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
 
 @bot.message_handler(commands=['boss'])
 def boss(msg):
@@ -415,12 +392,8 @@ def boss(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if time.time() - u.get("last_boss_hit", 0) < 2: return bot.reply_to(msg, "❌ Жди 2 сек.")
     u["last_boss_hit"] = time.time()
-    if boss_hp <= 0: 
-        boss_hp = 10000
-        return bot.reply_to(msg, "🐉 Новый босс!")
-    dmg = u["dmg"]
-    boss_hp -= dmg
-    u["coins"] += dmg * 2
+    if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
+    dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2
     bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}.")
 
 @bot.message_handler(commands=['shop'])
@@ -435,26 +408,18 @@ def buy_cb(call):
     if call.data == "open_chest":
         if not u.get("has_chest"): return bot.answer_callback_query(call.id, "❌ Нет кейса.")
         u["has_chest"] = False
-        if random.random() > 0.5: 
-            u["coins"] += 2000
-            bot.answer_callback_query(call.id, "✅ +2000!")
-        else: 
-            u["dmg"] += 5
-            bot.answer_callback_query(call.id, "✅ +5 урона!")
-        save_db()
-        return
+        if random.random() > 0.5: u["coins"] += 2000; bot.answer_callback_query(call.id, "✅ +2000!")
+        else: u["dmg"] += 5; bot.answer_callback_query(call.id, "✅ +5 урона!")
+        save_db(); return
     i = call.data.split("_")[1]
     if i == "antidote":
-    if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
-        u["coins"] -= 500
-        save_db()
-        return bot.answer_callback_query(call.id, "💊 ОК!")
+        if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌")
+        u["coins"] -= 500; save_db(); return bot.answer_callback_query(call.id, "💊 ОК!")
     p = BUSINESSES[i]["price"]
     if u["coins"] < p: return bot.answer_callback_query(call.id, "❌")
     u["coins"] -= p
     if "businesses" not in u: u["businesses"] = {}
-    u["businesses"][i] = 0
-    save_db()
+    u["businesses"][i] = 0; save_db()
     bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
 
 @bot.message_handler(commands=['business'])
@@ -463,22 +428,18 @@ def business_menu(msg):
     if not u.get("businesses"): return bot.reply_to(msg, "🏢 Купи в /shop.")
     text = "🏢 **БИЗНЕС**\n\n"
     for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
-    m = types.InlineKeyboardMarkup()
-    m.add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect"))
-    bot.reply_to(msg, text, reply_markup=m, parse_mode="Markdown")
+    m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect")); bot.reply_to(msg, text, reply_markup=m, parse_mode="Markdown")
 
 @bot.message_handler(commands=['daily'])
 def daily(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
     if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Раз в сутки!")
-    u["last_daily"] = time.time()
-    u["has_chest"] = True
+    u["last_daily"] = time.time(); u["has_chest"] = True
     bot.reply_to(msg, "🎁 Ты получил Ежедневный Кейс! Открой его в /shop.")
 
 @bot.message_handler(commands=['top'])
 def top(msg):
-    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
-    t = "🏆 **Топ:**\n\n"
+    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True); t = "🏆 **Топ:**\n\n"
     for i, (uid, d) in enumerate(s, 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)}\n"
     bot.reply_to(msg, t[:4000])
 
@@ -499,21 +460,14 @@ def reset_cmd(msg):
     if msg.from_user.id != OWNER_ID: return
     if msg.reply_to_message:
         target_id = str(msg.reply_to_message.from_user.id)
-        if target_id in users: 
-            users[target_id]["coins"] = 0
-            save_db()
-            bot.reply_to(msg, f"🧹 {users[target_id].get('name')} обнулен!")
-        else: 
-            bot.reply_to(msg, "❌ Нет в базе.")
+        if target_id in users: users[target_id]["coins"] = 0; save_db(); bot.reply_to(msg, f"🧹 {users[target_id].get('name')} обнулен!")
+        else: bot.reply_to(msg, "❌ Нет в базе.")
         return
     parts = msg.text.split()
     if len(parts) < 2: return bot.reply_to(msg, "❌ /reset @юзер или Reply")
     un = parts[1].replace("@", "").lower()
     for uid, data in users.items():
-        if data.get("username", "").lower() == un: 
-            data["coins"] = 0
-            save_db()
-            return bot.reply_to(msg, f"🧹 @{un} обнулен!")
+        if data.get("username", "").lower() == un: data["coins"] = 0; save_db(); return bot.reply_to(msg, f"🧹 @{un} обнулен!")
     bot.reply_to(msg, "❌ Не найден.")
 
 @bot.message_handler(commands=['ban'])
@@ -521,21 +475,13 @@ def ban_user(msg):
     if msg.from_user.id != OWNER_ID: return
     if msg.reply_to_message:
         target_id = str(msg.reply_to_message.from_user.id)
-        if target_id in users: 
-            del users[target_id]
-            save_db()
-            bot.reply_to(msg, f"🚫 {target_id} забанен!")
-        else: 
-            bot.reply_to(msg, "❌ Нет в базе.")
+        if target_id in users: del users[target_id]; save_db(); bot.reply_to(msg, f"🚫 {target_id} забанен!")
+        else: bot.reply_to(msg, "❌ Нет в базе.")
         return
     parts = msg.text.split()
     if len(parts) < 2: return bot.reply_to(msg, "❌ /ban [ID] или Reply")
-    if parts[1] in users: 
-        del users[parts[1]]
-        save_db()
-        bot.reply_to(msg, f"🚫 {parts[1]} забанен!")
-    else: 
-        bot.reply_to(msg, "❌ Не найден.")
+    if parts[1] in users: del users[parts[1]]; save_db(); bot.reply_to(msg, f"🚫 {parts[1]} забанен!")
+    else: bot.reply_to(msg, "❌ Не найден.")
 
 @bot.message_handler(commands=['gift'])
 def gift(msg):
@@ -546,18 +492,13 @@ def gift(msg):
     if len(parts) >= 2 and parts[-1].isdigit():
         a = int(parts[-1])
         if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
-        u["coins"] -= a
-        target["coins"] += a
-        save_db()
+        u["coins"] -= a; target["coins"] += a; save_db()
         bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
-    else: 
-        bot.reply_to(msg, "❌ /gift [Сумма]")
+    else: bot.reply_to(msg, "❌ /gift [Сумма]")
 
 @bot.message_handler(commands=['save'])
 def save_cmd(msg):
-    if msg.from_user.id == OWNER_ID: 
-        save_db()
-        bot.reply_to(msg, "💾 ОК!")
+    if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 ОК!")
 
 @bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
 def handle_msg(msg):
@@ -568,14 +509,10 @@ def handle_msg(msg):
         if msg.reply_to_message:
             t = pending_messages.get(msg.reply_to_message.message_id)
             if t:
-                try: 
-                    bot.copy_message(t, msg.chat.id, msg.message_id)
-                    bot.reply_to(msg, "✅!")
+                try: bot.copy_message(t, msg.chat.id, msg.message_id); bot.reply_to(msg, "✅!")
                 except: pass
         else:
-            try: 
-                bot.forward_message(FRIEND_ID, msg.chat.id, msg.message_id)
-                bot.forward_message(OWNER_ID, msg.chat.id, msg.message_id)
+            try: bot.forward_message(FRIEND_ID, msg.chat.id, msg.message_id); bot.forward_message(OWNER_ID, msg.chat.id, msg.message_id)
             except: pass
 
 def run_bot():
