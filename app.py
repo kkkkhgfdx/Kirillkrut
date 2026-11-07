@@ -189,7 +189,7 @@ def callback_handler(call):
             del clans[c_id]; save_db()
         bot.answer_callback_query(call.id, "🗑 Клан удален!", show_alert=True)
         bot.edit_message_text("Клан удален.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-            elif call.data == "menu_biz":
+    elif call.data == "menu_biz":
         if not u.get("businesses"): return bot.answer_callback_query(call.id, "❌ Нет бизнесов!", show_alert=True)
         text = "🏢 **Бизнесы**\n\n"
         for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
