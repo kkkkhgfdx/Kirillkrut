@@ -107,8 +107,8 @@ def callback_handler(call):
     u["coins"] -= p; u["businesses"][i] = time.time() - BUSINESSES[i]["cooldown"]; save_db()
     bot.answer_callback_query(call.id, f"✅ {BUSINESSES[i]['name']} куплен!")
     return
-      
-        bot.edit_message_text("🚜 **Синдикат 73.0**\nВыбирай:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id), parse_mode="Markdown")
+
+    bot.edit_message_text("🚜 **Синдикат 73.0**\nВыбирай:", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
     elif call.data == "menu_profile":
         clan_name = "Нет"
         if u.get("clan") and str(u["clan"]) in clans: clan_name = clans[str(u["clan"])].get("name", "Нет")
