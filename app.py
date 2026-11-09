@@ -138,7 +138,9 @@ def callback_handler(call):
         bot.edit_message_text("🛒 Магазин", call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "menu_clans":
     c_id = str(u.get("clan", ""))
-    if c_id and c_id in clans:
+    is_in_clan = (c_id and c_id in clans)
+    
+    if is_in_clan:
         c = clans[c_id]; leader_id = str(c.get("leader", ""))
         text = f"🛡 **{c.get('name')}**\n👑 Лидер: {users.get(leader_id, {}).get('name', '?')}\n💰 Банк: {c.get('bank', 0)}\n📈 Репа: {c.get('rep', 0)} (Ур. {c.get('lvl', 1)})\n🛡 Защита: {c.get('def', 0)}\n👥 Людей: {len(c.get('members', []))}"
         kb = types.InlineKeyboardMarkup(row_width=2)
