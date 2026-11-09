@@ -147,12 +147,12 @@ def callback_handler(call):
         if leader_id == uid: 
             kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Удалить", callback_data="clan_disband"))
             kb.add(types.InlineKeyboardButton("🔗 Инвайт", callback_data=f"clan_invite_{c_id}"))
-        kb.add(types.InlineKeyboardButton("💸 Вложить 1000", callback_data="clan_deposit"), types.InlineKeyboardButton("🛡 Апгрейд", callback_data="clan_upgrade"), types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+                kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text("Клан", call.message.chat.id, call.message.message_id, reply_markup=kb)
     else:
         kb = types.InlineKeyboardMarkup(row_width=1)
-        kb.add(types.InlineKeyboardButton("➕ Создать (5000 💰)", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text("🛡 Кланы\nСоздай банду или вступи!", call.message.chat.id, call.message.message_id, reply_markup=kb)
+        kb.add(types.InlineKeyboardButton("➕ Создать", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text("Кланы", call.message.chat.id, call.message.message_id, reply_markup=kb)
 elif call.data == "clan_create":
     if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌ Нужно 5000!", show_alert=True)
     u["coins"] -= 5000; c_id = str(random.randint(10000, 99999))
