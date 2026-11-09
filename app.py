@@ -137,8 +137,8 @@ def callback_handler(call):
         kb.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"), types.InlineKeyboardButton("🎁 Кейс", callback_data="open_chest"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("🛒 Магазин", call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "menu_clans":
-    c_id = str(u.get("clan", ""))
-    is_in_clan = (c_id and c_id in clans)
+         c_id = str(u.get("clan", ""))
+         is_in_clan = (c_id and c_id in clans)
     
     if is_in_clan:
         c = clans[c_id]; leader_id = str(c.get("leader", ""))
