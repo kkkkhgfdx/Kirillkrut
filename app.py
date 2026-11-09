@@ -230,3 +230,319 @@ elif call.data == "bank_1000":
 elif call.data == "safe_1000":
     if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
     u["coins"] -= 1000; u["safe"] = u.get("safe", 0) + 1000; save_db(); bot.answer_callback_query(call.id, "🔒 В сейфе! Ограбить не смогут.")
+    elif call.data == "menu_biz":
+        if not u.get("businesses"): return bot.answer_callback_query(call.id, "❌ Нет бизнесов!", show_alert=True)
+        text = "🏢 **Бизнесы**\n\n"
+        for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+    elif call.data == "biz_collect":
+        total = 0
+        for b, l in list(u["businesses"].items()):
+            if time.time() - l >= BUSINESSES[b]["cooldown"]: total += BUSINESSES[b]["income"]; u["businesses"][b] = time.time()
+        if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ Собрано: {total}!", show_alert=True)
+        else: bot.answer_callback_query(call.id, "⏳ Пусто.", show_alert=True)
+    elif call.data == "menu_boss":
+        text = f"🐉 **БОСС**\n❤️ HP: {boss_hp}/10000\n\nБей и получай деньги!"
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("⚔️ Ударить", callback_data="hit_boss"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+    elif call.data == "hit_boss":
+        if time.time() - u.get("last_boss_hit", 0) < 2: return bot.answer_callback_query(call.id, "❌ Жди 2с.", show_alert=True)
+        u["last_boss_hit"] = time.time()
+        if boss_hp <= 0: boss_hp = 10000; return bot.answer_callback_query(call.id, "🐉 Новый босс!", show_alert=True)
+        dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2; save_db()
+        bot.answer_callback_query(call.id, f"⚔️ -{dmg} HP. Осталось {boss_hp}.", show_alert=True)
+    elif call.data == "menu_casino":
+        kb = types.InlineKeyboardMarkup(row_width=2)
+        kb.add(types.InlineKeyboardButton("🎰 Слоты (100)", callback_data="casino_slots"), types.InlineKeyboardButton("🎡 Рулетка (1000)", callback_data="casino_roulette"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text("🎰 **Казино**", call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+    elif call.data == "casino_slots":
+        bet = 100
+        if u["coins"] < bet: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
+        u["coins"] -= bet; save_db(); bot.send_dice(call.message.chat.id, emoji="🎰"); time.sleep(2)
+        if random.random() > 0.8: u["coins"] += bet * 5; bot.send_message(call.message.chat.id, f"🎰 ДЖЕКПОТ! +{bet*5}")
+        elif random.random() > 0.5: u["coins"] += bet; bot.send_message(call.message.chat.id, f"🎰 +{bet}")
+        else: bot.send_message(call.message.chat.id, f"🎰 -{bet}")
+    elif call.data == "casino_roulette":
+        bet = 1000
+        if u["coins"] < bet: return bot.answer_callback_query(call.id, "❌ Мало!", show_alert=True)
+        u["coins"] -= bet; save_db()
+        if random.random() > 0.5: u["coins"] += bet * 3; bot.answer_callback_query(call.id, f"🔥 +{bet*3}!", show_alert=True)
+        else: bot.answer_callback_query(call.id, f"💀 -{bet}!", show_alert=True)
+    elif call.data == "menu_mine":
+        if time.time() - u.get("last_mine", 0) < 60: return bot.answer_callback_query(call.id, "❌ Жди минуту.", show_alert=True)
+        u["last_mine"] = time.time(); res = random.random()
+        if res > 0.8: w = 1000; u["coins"] += w; bot.answer_callback_query(call.id, f"💎 +{w}!", show_alert=True)
+        elif res > 0.4: w = 300; u["coins"] += w; bot.answer_callback_query(call.id, f"🪙 +{w}!", show_alert=True)
+        elif res > 0.1: w = 50; u["coins"] += w; bot.answer_callback_query(call.id, f"⛏ +{w}.", show_alert=True)
+        else: w = min(200, u["coins"]); u["coins"] -= w; bot.answer_callback_query(call.id, f"💥 -{w}.", show_alert=True)
+        save_db()
+    elif call.data == "menu_smuggle":
+        if time.time() - u.get("last_smuggle", 0) < 60: return bot.answer_callback_query(call.id, "❌ Жди минуту.", show_alert=True)
+        if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Нужно 1000.", show_alert=True)
+        u["last_smuggle"] = time.time(); save_db()
+        if random.random() > 0.5: u["coins"] += 3000; bot.answer_callback_query(call.id, "🕵️ +3000.", show_alert=True)
+        else: u["coins"] -= 1000; bot.answer_callback_query(call.id, "🚔 -1000.", show_alert=True)
+    elif call.data == "menu_daily":
+        if time.time() - u.get("last_daily", 0) < 86400: return bot.answer_callback_query(call.id, "❌ Раз в сутки!", show_alert=True)
+        u["last_daily"] = time.time(); u["has_chest"] = True; save_db(); bot.answer_callback_query(call.id, "🎁 Кейс получен!", show_alert=True)
+    elif call.data == "menu_top":
+        s = sorted(users.items(), key=lambda x: x[1].get("coins", 0) + x[1].get("safe", 0), reverse=True); t = "🏆 **Топ:**\n\n"
+        for i, (user_id, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0) + d.get('safe', 0)} 💰\n"
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+        bot.edit_message_text(t, call.message.chat.id, call.message.message_id, reply_markup=kb, parse_mode="Markdown")
+
+@bot.message_handler(commands=['start', 'menu'])
+def start(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if msg.from_user.username: u["username"] = msg.from_user.username
+    if msg.text == "/start": give_achieve(msg.from_user.id, "Первые шаги", 100)
+    bot.send_message(msg.chat.id, f"🔥 **Синдикат 74.0**\nПривет, {msg.from_user.first_name}! Жми кнопки:", reply_markup=main_kb(msg.from_user.id), reply_to_message_id=msg.message_id, parse_mode="Markdown")
+
+@bot.message_handler(commands=['myclan'])
+def myclan_cmd(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    c_id = str(u.get("clan", ""))
+    if not c_id or c_id not in clans: return bot.reply_to(msg, "🛡 Нет клана. Жми /menu -> Кланы.")
+    c = clans[c_id]; leader_id = str(c.get("leader", ""))
+    text = f"🛡 **{c.get('name')}**\n👑 Лидер: {users.get(leader_id, {}).get('name', '?')}\n💰 Банк: {c.get('bank', 0)}\n📈 Репа: {c.get('rep', 0)} (Ур. {c.get('lvl', 1)})\n🛡 Защита: {c.get('def', 0)}\n👥 Людей: {len(c.get('members', []))}"
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    if leader_id == str(msg.from_user.id): kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🛡 Апгрейд", callback_data="clan_upgrade"), types.InlineKeyboardButton("🔗 Инвайт", callback_data=f"clan_invite_{c_id}"))
+    kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"))
+    bot.reply_to(msg, text, reply_markup=kb)
+
+@bot.message_handler(commands=['clantop'])
+def clantop_cmd(msg):
+    if not clans: return bot.reply_to(msg, "❌ Кланов нет.")
+    s = sorted(clans.items(), key=lambda x: (x[1].get("rep", 0), x[1].get("bank", 0)), reverse=True)
+    t = "🏆 **Топ кланов:**\n\n"
+    for i, (cid, c) in enumerate(s[:10], 1): t += f"{i}. 🛡 **{c.get('name')}** | Репа: {c.get('rep', 0)} | Ур: {c.get('lvl', 1)}\n"
+    bot.reply_to(msg, t, parse_mode="Markdown")
+
+@bot.message_handler(commands=['paydebt'])
+def paydebt_cmd(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u.get("debt", 0) <= 0: return bot.reply_to(msg, "✅ Нет долгов!")
+    if u["coins"] < u["debt"]: return bot.reply_to(msg, f"❌ Мало! Долг: {u['debt']}.")
+    u["coins"] -= u["debt"]; u["debt"] = 0; save_db(); bot.reply_to(msg, "✅ Долг погашен!")
+
+@bot.message_handler(commands=['mine'])
+def mine(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_mine", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
+    u["last_mine"] = time.time(); res = random.random()
+    if res > 0.8: w = 1000; u["coins"] += w; bot.reply_to(msg, f"💎 +{w}!")
+    elif res > 0.4: w = 300; u["coins"] += w; bot.reply_to(msg, f"🪙 +{w}!")
+    elif res > 0.1: w = 50; u["coins"] += w; bot.reply_to(msg, f"⛏ +{w}.")
+    else: w = min(200, u["coins"]); u["coins"] -= w; bot.reply_to(msg, f"💥 -{w}.")
+
+@bot.message_handler(commands=['smuggle'])
+def smuggle(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
+    if u["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно 1000.")
+    u["last_smuggle"] = time.time()
+    if random.random() > 0.5: u["coins"] += 3000; bot.reply_to(msg, "🕵️ +3000.")
+    else: u["coins"] -= 1000; bot.reply_to(msg, "🚔 -1000.")
+
+@bot.message_handler(commands=['duelclub'])
+def duelclub(msg):
+    global duel_club
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u["coins"] < 500: return bot.reply_to(msg, "❌ Ставка 500.")
+    if str(msg.from_user.id) in duel_club["players"]: return bot.reply_to(msg, "❌ Ты уже в клубе.")
+    u["coins"] -= 500; duel_club["pot"] += 500; duel_club["players"][str(msg.from_user.id)] = u["name"]
+    bot.reply_to(msg, f"⚔️ Банк: {duel_club['pot']}. Ждем...")
+    if len(duel_club["players"]) >= 3:
+        winner_id = random.choice(list(duel_club["players"].keys())); winner_name = duel_club["players"][winner_id]
+        get_u(winner_id)["coins"] += duel_club["pot"]; bot.send_message(CHAT_ID, f"🏆 **КЛУБ:** {winner_name} забирает {duel_club['pot']}!"); duel_club = {"pot": 0, "players": {}}
+
+@bot.message_handler(commands=['loan'])
+def loan(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10с.")
+    if u["debt"] > 0: return bot.reply_to(msg, "❌ Верни долг (/paydebt)!")
+    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; bot.reply_to(msg, "🏦 +1000. Долг: 1500.")
+
+@bot.message_handler(commands=['rob'])
+def rob(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10с.")
+    u["last_rob"] = time.time()
+    if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 +300!")
+    else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 -{p}")
+
+@bot.message_handler(commands=['bank'])
+def bank(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u.get("bank_deposit", 0) > 0:
+        if time.time() - u.get("bank_time", 0) >= 86400:
+            u["coins"] += int(u["bank_deposit"] * 1.2)
+            u["bank_deposit"] = 0
+            bot.reply_to(msg, "🏦 Банк начислил проценты!")
+        else: bot.reply_to(msg, "🏦 Жди 24ч.")
+        return
+    m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("Вложить 1000", callback_data="bank_1000")); bot.reply_to(msg, "🏦 Банк (20%)", reply_markup=m)
+
+@bot.message_handler(commands=['steal'])
+def steal(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_steal", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    u["last_steal"] = time.time()
+    if random.random() > 0.4: s = min(500, target["coins"]); target["coins"] -= s; u["coins"] += s; bot.reply_to(msg, f"🥷 Украл {s}!")
+    else: u["coins"] -= min(300, u["coins"]); bot.reply_to(msg, "🚔 Поймали!")
+
+@bot.message_handler(commands=['infect'])
+def infect(msg):
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    if tid == str(msg.from_user.id): return bot.reply_to(msg, "❌ Себя нельзя.")
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if u["coins"] < 300: return bot.reply_to(msg, "❌ Нужно 300.")
+    u["coins"] -= 300; target["virus_until"] = time.time() + 3600; bot.reply_to(msg, f"🦠 Заразил {target['name']}!")
+
+@bot.message_handler(commands=['duel'])
+def duel(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_duel", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    if tid == str(msg.from_user.id): return bot.reply_to(msg, "❌ Себя нельзя.")
+    bet = int(msg.text.split()[-1]) if msg.text.split()[-1].isdigit() else 100
+    if u["coins"] < bet: return bot.reply_to(msg, "❌ Мало.")
+    u["last_duel"] = time.time()
+    if random.random() > 0.5: u["coins"] += bet; target["coins"] -= bet; bot.reply_to(msg, f"🤺 Победил {target['name']}!")
+    else: u["coins"] -= bet; target["coins"] += bet; bot.reply_to(msg, f"🤺 {target['name']} победил.")
+
+@bot.message_handler(commands=['casino'])
+def casino(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    parts = msg.text.split()
+    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /casino 100")
+    bet = int(parts[1])
+    if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало.")
+    bot.send_dice(msg.chat.id, emoji="🎰"); time.sleep(3); res = random.randint(1, 64)
+    if res == 64: u["coins"] += bet * 5; bot.reply_to(msg, f"🎰 ДЖЕКПОТ! +{bet*5}")
+    elif res >= 32: u["coins"] += bet; bot.reply_to(msg, f"🎰 +{bet}")
+    else: u["coins"] -= bet; bot.reply_to(msg, f"🎰 -{bet}")
+
+@bot.message_handler(commands=['boss'])
+def boss(msg):
+    global boss_hp
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_boss_hit", 0) < 2: return bot.reply_to(msg, "❌ Жди 2 сек.")
+    u["last_boss_hit"] = time.time()
+    if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
+    dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2
+    bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}.")
+
+@bot.message_handler(commands=['shop'])
+def shop(msg):
+    m = types.InlineKeyboardMarkup(row_width=1)
+    m.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"), types.InlineKeyboardButton("🎁 Открыть Кейс", callback_data="open_chest"))
+    bot.reply_to(msg, "🛒 **Магазин**", reply_markup=m)
+
+@bot.message_handler(commands=['business'])
+def business_menu(msg):
+    u = get_u(msg.from_user.id)
+    if not u.get("businesses"): return bot.reply_to(msg, "🏢 Купи в /shop.")
+    text = "🏢 **БИЗНЕС**\n\n"
+    for b, l in u["businesses"].items(): text += f"{BUSINESSES[b]['name']} — {'✅' if time.time() - l >= BUSINESSES[b]['cooldown'] else '⏳'}\n"
+    m = types.InlineKeyboardMarkup(); m.add(types.InlineKeyboardButton("💰 Собрать", callback_data="biz_collect")); bot.reply_to(msg, text, reply_markup=m, parse_mode="Markdown")
+
+@bot.message_handler(commands=['daily'])
+def daily(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Раз в сутки!")
+    u["last_daily"] = time.time(); u["has_chest"] = True
+    bot.reply_to(msg, "🎁 Ты получил Ежедневный Кейс! Открой его в /shop.")
+
+@bot.message_handler(commands=['top'])
+def top(msg):
+    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True); t = "🏆 **Топ:**\n\n"
+    for i, (uid, d) in enumerate(s, 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)}\n"
+    bot.reply_to(msg, t[:4000])
+
+@bot.message_handler(commands=['profile'])
+def profile(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
+    bot.reply_to(msg, f"👤 {u['name']}\n💰 {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n📈 Уровень: {u['lvl']} (DMG: {u['dmg']})\n🛡 Клан: {clan_name}\n🏆 Ачивок: {len(u['achieves'])}")
+
+@bot.message_handler(commands=['achieves'])
+def show_achieves(msg):
+    u = get_u(msg.from_user.id)
+    if not u["achieves"]: return bot.reply_to(msg, "Нет ачивок.")
+    bot.reply_to(msg, "🏆 Ачивки:\n" + "\n".join(u["achieves"]))
+
+@bot.message_handler(commands=['reset'])
+def reset_cmd(msg):
+    if msg.from_user.id != OWNER_ID: return
+    if msg.reply_to_message:
+        target_id = str(msg.reply_to_message.from_user.id)
+        if target_id in users: users[target_id]["coins"] = 0; save_db(); bot.reply_to(msg, f"🧹 {users[target_id].get('name')} обнулен!")
+        else: bot.reply_to(msg, "❌ Нет в базе.")
+        return
+    parts = msg.text.split()
+    if len(parts) < 2: return bot.reply_to(msg, "❌ /reset @юзер или Reply")
+    un = parts[1].replace("@", "").lower()
+    for uid, data in users.items():
+        if data.get("username", "").lower() == un: data["coins"] = 0; save_db(); return bot.reply_to(msg, f"🧹 @{un} обнулен!")
+    bot.reply_to(msg, "❌ Не найден.")
+
+@bot.message_handler(commands=['ban'])
+def ban_user(msg):
+    if msg.from_user.id != OWNER_ID: return
+    if msg.reply_to_message:
+        target_id = str(msg.reply_to_message.from_user.id)
+        if target_id in users: del users[target_id]; save_db(); bot.reply_to(msg, f"🚫 {target_id} забанен!")
+        else: bot.reply_to(msg, "❌ Нет в базе.")
+        return
+    parts = msg.text.split()
+    if len(parts) < 2: return bot.reply_to(msg, "❌ /ban [ID] или Reply")
+    if parts[1] in users: del users[parts[1]]; save_db(); bot.reply_to(msg, f"🚫 {parts[1]} забанен!")
+    else: bot.reply_to(msg, "❌ Не найден.")
+
+@bot.message_handler(commands=['gift'])
+def gift(msg):
+    tid, target = get_target(msg)
+    if not target: return bot.reply_to(msg, "❌ @юзер или Reply.")
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    parts = msg.text.split()
+    if len(parts) >= 2 and parts[-1].isdigit():
+        a = int(parts[-1])
+        if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
+        u["coins"] -= a; target["coins"] += a; save_db()
+        bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
+    else: bot.reply_to(msg, "❌ /gift [Сумма]")
+
+@bot.message_handler(commands=['save'])
+def save_cmd(msg):
+    if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 ОК!")
+
+@bot.message_handler(content_types=['text', 'photo', 'video', 'document'])
+def handle_msg(msg):
+    if msg.chat.type != 'private': return
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if msg.from_user.username: u["username"] = msg.from_user.username
+    if msg.from_user.id == OWNER_ID:
+        if msg.reply_to_message:
+            t = pending_messages.get(msg.reply_to_message.message_id)
+            if t:
+                try: bot.copy_message(t, msg.chat.id, msg.message_id); bot.reply_to(msg, "✅!")
+                except: pass
+        else:
+            try: bot.forward_message(FRIEND_ID, msg.chat.id, msg.message_id); bot.forward_message(OWNER_ID, msg.chat.id, msg.message_id)
+            except: pass
+
+def run_bot():
+    cmds = [BotCommand("menu", "Меню"), BotCommand("start", "Старт"), BotCommand("help", "Справка"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"), BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("paydebt", "Вернуть долг"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("duelclub", "Дуэльный Клуб"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("duel", "Дуэль"), BotCommand("myclan", "Мой Клан"), BotCommand("clantop", "Топ Кланов"), BotCommand("achieves", "Ачивки"), BotCommand("daily", "Бонус"), BotCommand("gift", "Подарить"), BotCommand("save", "Сохранить"), BotCommand("reset", "Обнулить")]
+    bot.set_my_commands(cmds)
+    print("🚀 СИНДИКАТ 74.0 ЗАПУЩЕН!")
+    bot.infinity_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
