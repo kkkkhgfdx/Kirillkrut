@@ -117,11 +117,7 @@ def callback_handler(call):
     if u.get("debt", 0) > 0: kb.add(types.InlineKeyboardButton("💸 Вернуть долг", callback_data="pay_debt"))
     kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
     bot.send_message(call.message.chat.id, "Профиль")
-elif call.data == "pay_debt":
-    if u.get("debt", 0) <= 0: return bot.answer_callback_query(call.id, "✅ Нет долгов!")
-    if u["coins"] < u["debt"]: return bot.answer_callback_query(call.id, f"❌ Мало! Долг: {u['debt']}")
-    u["coins"] -= u["debt"]; u["debt"] = 0; save_db()
-    bot.answer_callback_query(call.id, "✅ Долг погашен!")
+    
 elif call.data == "menu_shop":
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("🌾 Ферма", callback_data="buy_farm"))
