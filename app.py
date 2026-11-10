@@ -152,7 +152,7 @@ def callback_handler(call):
     else:
         kb = types.InlineKeyboardMarkup(row_width=1)
         kb.add(types.InlineKeyboardButton("➕ Создать", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text("Кланы", call.message.chat.id, call.message.message_id, reply_markup=kb)
+        bot.edit_message_text("Кланы", call.message.chat.id, reply_markup=kb)
 elif call.data == "clan_create":
     if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌ Нужно 5000!", show_alert=True)
     u["coins"] -= 5000; c_id = str(random.randint(10000, 99999))
