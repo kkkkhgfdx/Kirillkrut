@@ -137,30 +137,12 @@ def callback_handler(call):
         kb.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"), types.InlineKeyboardButton("🎁 Кейс", callback_data="open_chest"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("🛒 Магазин", call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "menu_clans":
-         c_id = str(u.get("clan", ""))
-         is_in_clan = (c_id and c_id in clans)
-    
-    if is_in_clan:
-        c = clans[c_id]; leader_id = str(c.get("leader", ""))
-        text = f"🛡 **{c.get('name')}**\n👑 Лидер: {users.get(leader_id, {}).get('name', '?')}\n💰 Банк: {c.get('bank', 0)}\n📈 Репа: {c.get('rep', 0)} (Ур. {c.get('lvl', 1)})\n🛡 Защита: {c.get('def', 0)}\n👥 Людей: {len(c.get('members', []))}"
-        kb = types.InlineKeyboardMarkup(row_width=2)
-        if leader_id == uid: 
-            kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Удалить", callback_data="clan_disband"))
-            kb.add(types.InlineKeyboardButton("🔗 Инвайт", callback_data=f"clan_invite_{c_id}"))
-            kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text("Клан", call.message.chat.id, call.message.message_id, reply_markup=kb)
+    c_id = str(u.get("clan", ""))
+    if c_id and c_id in clans:
+        bot.edit_message_text("Ты в клане! Пиши /myclan для управления.", call.message.chat.id, call.message.message_id)
     else:
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        kb.add(types.InlineKeyboardButton("➕ Создать", callback_data="clan_create"), types.InlineKeyboardButton("📋 Список", callback_data="clan_list"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-        bot.edit_message_text("Кланы", call.message.chat.id, reply_markup=kb)
-elif call.data == "clan_create":
-    if u["coins"] < 5000: return bot.answer_callback_query(call.id, "❌ Нужно 5000!", show_alert=True)
-    u["coins"] -= 5000; c_id = str(random.randint(10000, 99999))
-    while c_id in clans: c_id = str(random.randint(10000, 99999))
-    clans[c_id] = {"name": f"Клан_{u['name'][:5]}", "leader": uid, "bank": 0, "rep": 0, "lvl": 1, "def": 0, "members": [uid]}
-    u["clan"] = c_id; u["clan_rank"] = "Лидер"; save_db()
-    bot.answer_callback_query(call.id, "✅ Клан создан!", show_alert=True)
-    bot.edit_message_text("🛡 **Клан создан!** Иди в /myclan.", call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("Создать", callback_data="clan_create")).add(types.InlineKeyboardButton("Список", callback_data="clan_list"))
+        bot.edit_message_text("Кланы", call.message.chat.id, call.message.message_id, reply_markup=kb)
 elif call.data == "clan_list":
     if not clans: return bot.answer_callback_query(call.id, "❌ Кланов нет.", show_alert=True)
     kb = types.InlineKeyboardMarkup(row_width=1)
