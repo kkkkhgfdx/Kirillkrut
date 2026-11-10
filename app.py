@@ -34,7 +34,7 @@ def save_db():
         data = {"users": users, "clans": clans}
         with open("users.json", "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=4)
         with open("users.json", "rb") as f:
-            sent = bot.send_document(CHAT_ID, f, caption="💾 База Синдиката 74.0")
+            sent = bot.send_document(CHAT_ID, f, caption="💾 База")
             try: bot.pin_chat_message(CHAT_ID, sent.message_id, disable_notification=True)
             except: pass
     except: pass
@@ -110,14 +110,18 @@ def callback_handler(call):
 
     if call.data == "menu_main": 
         bot.edit_message_text("🚜 Синдикат 74.0", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
-    elif call.data == "menu_profile":
-         clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
-         text = f"👤 {u['name']}\n💰 Монеты: {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n🔒 Сейф: {u.get('safe', 0)}\n📈 Уровень: {u['lvl']}\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: {clan_name}"
-         kb = types.InlineKeyboardMarkup()
+     elif call.data == "menu_profile":
+    clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
+    text = f"👤 {u['name']}\n💰 Монеты: {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n🔒 Сейф: {u.get('safe', 0)}\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: {clan_name}"
+    kb = types.InlineKeyboardMarkup()
     if u.get("debt", 0) > 0: kb.add(types.InlineKeyboardButton("💸 Вернуть долг", callback_data="pay_debt"))
     kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
-    bot.send_message(call.message.chat.id, "Профиль")
-    
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb)
+elif call.data == "pay_debt":
+    if u.get("debt", 0) <= 0: return bot.answer_callback_query(call.id, "✅ Нет долгов!")
+    if u["coins"] < u["debt"]: return bot.answer_callback_query(call.id, f"❌ Мало! Долг: {u['debt']}")
+    u["coins"] -= u["debt"]; u["debt"] = 0; save_db()
+    bot.answer_callback_query(call.id, "✅ Долг погашен!")
 elif call.data == "menu_shop":
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("🌾 Ферма", callback_data="buy_farm"))
@@ -238,7 +242,7 @@ elif call.data == "menu_top":
     bot.edit_message_text(t, call.message.chat.id, call.message.message_id)
 elif call.data == "menu_daily":
     if time.time() - u.get("last_daily", 0) < 86400: return bot.answer_callback_query(call.id, "❌ Раз в сутки!")
-    u["last_daily"] = time.time(); u["has_chest"] = True; save_db(); bot.answer_callback_query(call.id, "🎁 Кейс получен")
+    u["last_daily"] = time.time(); u["has_chest"] = True; save_db(); bot.answer_callback_query(call.id, "🎁 Кейс получен")   
 @bot.message_handler(commands=['start', 'menu'])
 def start(msg):
     u = get_u(msg.from_user.id, msg.from_user.first_name)
@@ -344,13 +348,11 @@ def save_cmd(msg):
 
 def run_bot():
     cmds = [
-        BotCommand("menu", "Меню"), BotCommand("start", "Старт"), BotCommand("help", "Справка"),
+        BotCommand("menu", "Меню"), BotCommand("start", "Старт"), BotCommand("massa", "Полетели"),
         BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"),
-        BotCommand("business", "Бизнесы"), BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"),
-        BotCommand("paydebt", "Вернуть долг"), BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"),
-        BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"),
-        BotCommand("steal", "Украсть"), BotCommand("duel", "Дуэль"), BotCommand("myclan", "Мой Клан"),
-        BotCommand("clantop", "Топ Кланов"), BotCommand("daily", "Бонус"), BotCommand("massa", "Полетели, масса!")
+        BotCommand("bank", "Банк"), BotCommand("loan", "Кредит"), BotCommand("paydebt", "Долг"),
+        BotCommand("rob", "Ограбить"), BotCommand("boss", "Босс"), BotCommand("casino", "Казино"),
+        BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("myclan", "Клан")
     ]
     bot.set_my_commands(cmds)
     print("🚀 СИНДИКАТ 74.0 ЗАПУЩЕН!")
