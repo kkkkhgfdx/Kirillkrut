@@ -140,7 +140,7 @@ def callback_handler(call):
          if u.get("clan"):
              bot.edit_message_text("Ты в клане. Пиши /myclan", call.message.chat.id, call.message.message_id)
     else:
-             bot.edit_message_text("Кланов нет. Пиши /menu", call.message.chat.id, call.message.message_id)
+             bot.reply_to(call.message, "Нет кланов")
 elif call.data == "clan_list":
     if not clans: return bot.answer_callback_query(call.id, "❌ Кланов нет.", show_alert=True)
     kb = types.InlineKeyboardMarkup(row_width=1)
