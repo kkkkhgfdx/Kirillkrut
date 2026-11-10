@@ -137,10 +137,10 @@ def callback_handler(call):
         kb.add(types.InlineKeyboardButton("🌾 Ферма (1000)", callback_data="buy_farm"), types.InlineKeyboardButton("🌳 Сад (3000)", callback_data="buy_garden"), types.InlineKeyboardButton("🏭 Завод (10000)", callback_data="buy_factory"), types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"), types.InlineKeyboardButton("🎁 Кейс", callback_data="open_chest"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("🛒 Магазин", call.message.chat.id, call.message.message_id, reply_markup=kb)
     elif call.data == "menu_clans":
-    if u.get("clan"):
-        bot.edit_message_text("Ты в клане. Пиши /myclan", call.message.chat.id, call.message.message_id)
+         if u.get("clan"):
+             bot.edit_message_text("Ты в клане. Пиши /myclan", call.message.chat.id, call.message.message_id)
     else:
-        bot.edit_message_text("Кланов нет. Пиши /menu", call.message.chat.id, call.message.message_id)
+             bot.edit_message_text("Кланов нет. Пиши /menu", call.message.chat.id, call.message.message_id)
 elif call.data == "clan_list":
     if not clans: return bot.answer_callback_query(call.id, "❌ Кланов нет.", show_alert=True)
     kb = types.InlineKeyboardMarkup(row_width=1)
