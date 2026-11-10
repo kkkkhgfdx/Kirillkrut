@@ -147,7 +147,7 @@ def callback_handler(call):
         if leader_id == uid: 
             kb.add(types.InlineKeyboardButton("⚔️ Рейд", callback_data="clan_raid_menu"), types.InlineKeyboardButton("🗑 Удалить", callback_data="clan_disband"))
             kb.add(types.InlineKeyboardButton("🔗 Инвайт", callback_data=f"clan_invite_{c_id}"))
-                kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
+            kb.add(types.InlineKeyboardButton("👥 Люди", callback_data="clan_members"), types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
         bot.edit_message_text("Клан", call.message.chat.id, call.message.message_id, reply_markup=kb)
     else:
         kb = types.InlineKeyboardMarkup(row_width=1)
