@@ -141,8 +141,10 @@ def callback_handler(call):
          if c_id and c_id in clans:
             bot.edit_message_text("Ты в клане! Пиши /myclan для управления.", call.message.chat.id, call.message.message_id)
     else:
-            kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("Создать", callback_data="clan_create"), types.InlineKeyboardButton("Список", callback_data="clan_list"))
-            bot.edit_message_text("Кланы", call.message.chat.id, call.message.message_id, reply_markup=kb)
+            kb = types.InlineKeyboardMarkup()
+            kb.add(types.InlineKeyboardButton("Создать", callback_data="clan_create"))
+            kb.add(types.InlineKeyboardButton("Список", callback_data="clan_list"))
+            bot.edit_message_text("Кланы", call.message.chat.id, reply_markup=kb)
 elif call.data == "clan_list":
     if not clans: return bot.answer_callback_query(call.id, "❌ Кланов нет.", show_alert=True)
     kb = types.InlineKeyboardMarkup(row_width=1)
