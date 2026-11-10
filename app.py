@@ -111,9 +111,9 @@ def callback_handler(call):
     if call.data == "menu_main": 
         bot.edit_message_text("🚜 Синдикат 74.0", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id))
     elif call.data == "menu_profile":
-    clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
-    text = f"👤 {u['name']}\n💰 Монеты: {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n🔒 Сейф: {u.get('safe', 0)}\n📈 Уровень: {u['lvl']}\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: {clan_name}"
-    kb = types.InlineKeyboardMarkup()
+         clan_name = clans[u["clan"]]["name"] if u.get("clan") and u["clan"] in clans else "Нет"
+         text = f"👤 {u['name']}\n💰 Монеты: {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n🔒 Сейф: {u.get('safe', 0)}\n📈 Уровень: {u['lvl']}\n🏢 Бизнесов: {len(u['businesses'])}\n🛡 Клан: {clan_name}"
+         kb = types.InlineKeyboardMarkup()
     if u.get("debt", 0) > 0: kb.add(types.InlineKeyboardButton("💸 Вернуть долг", callback_data="pay_debt"))
     kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="menu_main"))
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=kb)
