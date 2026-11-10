@@ -144,7 +144,7 @@ def callback_handler(call):
             kb = types.InlineKeyboardMarkup()
             kb.add(types.InlineKeyboardButton("Создать", callback_data="clan_create"))
             kb.add(types.InlineKeyboardButton("Список", callback_data="clan_list"))
-            bot.edit_message_text("Кланы", call.message.chat.id, reply_markup=kb)
+            bot.send_message(call.message.chat.id, "Кланы", reply_markup=kb)
 elif call.data == "clan_list":
     if not clans: return bot.answer_callback_query(call.id, "❌ Кланов нет.", show_alert=True)
     kb = types.InlineKeyboardMarkup(row_width=1)
