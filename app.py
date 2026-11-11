@@ -247,7 +247,26 @@ def top(msg):
 def save_cmd(msg):
     if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 Сохранено!")
 
-# А ВОТ ЗДЕСЬ ВСЕ КОМАНДЫ ДЛЯ СИНЕГО МЕНЮ:
+@bot.message_handler(commands=['infect'])
+def infect_cmd(msg):
+    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на жертву!")
+    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
+    if u["coins"] < 300: return bot.reply_to(msg, "❌ Нужно 300!")
+    u["coins"] -= 300; target["dmg"] = max(1, target["dmg"] - 2); save_db()
+    bot.reply_to(msg, f"🦠 Заразил {target['name']}! -2 урона.")
+
+@bot.message_handler(commands=['heist'])
+def heist_cmd(msg):
+    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на напарника!")
+    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
+    if u["coins"] < 1000 or target["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно по 1000!")
+    total_dmg = u["dmg"] + target["dmg"]
+    if random.randint(1, 100) < (total_dmg * 2):
+        u["coins"] += 2500; target["coins"] += 2500; save_db(); bot.reply_to(msg, "💰 УСПЕХ! Вы забрали по 2500!")
+    else:
+        u["coins"] -= 1000; target["coins"] -= 1000; save_db(); bot.reply_to(msg, "🚔 ВАС ПОВЯЗАЛИ! -1000.")
+
+# --- ЗАПУСК БОТА ---
 def run_bot():
     cmds = [
         BotCommand("start", "Старт"),
@@ -273,23 +292,9 @@ def run_bot():
         BotCommand("heist", "Ограбить банк")
     ]
     bot.set_my_commands(cmds)
+    print("🚀 СИНДИКАТ 75.0 ЗАПУЩЕН!")
     bot.infinity_polling()
-    
-@bot.message_handler(commands=['infect'])
-def infect_cmd(msg):
-    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на жертву!")
-    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
-    if u["coins"] < 300: return bot.reply_to(msg, "❌ Нужно 300!")
-    u["coins"] -= 300; target["dmg"] = max(1, target["dmg"] - 2); save_db()
-    bot.reply_to(msg, f"🦠 Заразил {target['name']}! -2 урона.")
 
-@bot.message_handler(commands=['heist'])
-def heist_cmd(msg):
-    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на напарника!")
-    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
-    if u["coins"] < 1000 or target["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно по 1000!")
-    total_dmg = u["dmg"] + target["dmg"]
-    if random.randint(1, 100) < (total_dmg * 2):
-        u["coins"] += 2500; target["coins"] += 2500; save_db(); bot.reply_to(msg, "💰 УСПЕХ! Вы забрали по 2500!")
-    else:
-        u["coins"] -= 1000; target["coins"] -= 1000; save_db(); bot.reply_to(msg, "🚔 ВАС ПОВЯЗАЛИ! -1000.")
+if __name__ == "__main__":
+    threading.Thread(target=run_bot, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
