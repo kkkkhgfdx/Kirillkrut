@@ -219,6 +219,36 @@ def hack(msg):
         else: u["coins"] += 500; bot.reply_to(msg, "💻 Взлом! Но все пустые, вернул 500.")
     else: bot.reply_to(msg, "🚨 Взлом провален! -500.")
     save_db()
+    
+@bot.message_handler(commands=['shop'])
+def shop_cmd_fixed(msg):
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton(f"🌾 Ферма ({BUSINESSES['farm']['price']})", callback_data="buy_farm"))
+    kb.add(types.InlineKeyboardButton(f"🌳 Сад ({BUSINESSES['garden']['price']})", callback_data="buy_garden"))
+    kb.add(types.InlineKeyboardButton(f"🏭 Завод ({BUSINESSES['factory']['price']})", callback_data="buy_factory"))
+    kb.add(types.InlineKeyboardButton("💊 Антидот (500)", callback_data="buy_antidote"))
+    kb.add(types.InlineKeyboardButton("🎁 Кейс (1000)", callback_data="buy_chest"))
+    bot.reply_to(msg, "🛒 **Магазин:**", reply_markup=kb)
+
+@bot.callback_query_handler(func=lambda call: call.data in ["buy_antidote", "buy_chest", "open_chest"])
+def shop_callback_fixed(call):
+    u = get_u(call.from_user.id, call.from_user.first_name)
+    if call.data == "buy_antidote":
+        if u["coins"] < 500: return bot.answer_callback_query(call.id, "❌ Мало монет!")
+        u["coins"] -= 500; u["antidote"] = u.get("antidote", 0) + 1; save_db()
+        return bot.answer_callback_query(call.id, "✅ Антидот куплен!")
+    elif call.data == "buy_chest":
+        if u["coins"] < 1000: return bot.answer_callback_query(call.id, "❌ Мало монет!")
+        u["coins"] -= 1000; u["has_chest"] = True; save_db()
+        return bot.answer_callback_query(call.id, "✅ Кейс куплен! Пиши /open для открытия.")
+    elif call.data == "open_chest":
+        if not u.get("has_chest"): return bot.answer_callback_query(call.id, "❌ У тебя нет кейса!")
+        u["has_chest"] = False
+        if random.random() > 0.5: 
+            u["coins"] += 2000; bot.answer_callback_query(call.id, "🎁 Из кейса выпало 2000 монет!")
+        else: 
+            u["dmg"] += 5; bot.answer_callback_query(call.id, "🎁 Из кейса выпало +5 к урону!")
+        save_db()
 
 def run_bot():
     cmds = [BotCommand("start", "Старт"), BotCommand("menu", "Меню"), BotCommand("shop", "Магазин"), BotCommand("massa", "Полетели"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("business", "Бизнесы"), BotCommand("collect", "Собрать"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("casino", "Казино"), BotCommand("loan", "Кредит"), BotCommand("paydebt", "Долг"), BotCommand("rob", "Ограбить"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("hack", "Взлом"), BotCommand("daily", "Бонус")]
