@@ -269,109 +269,27 @@ def run_bot():
         BotCommand("myclan", "Мой клан"),
         BotCommand("clantop", "Топ кланов"),
         BotCommand("gift", "Подарить"),
-        BotCommand("save", "Сохранить")
+        BotCommand("infect", "Заразить"),
+        BotCommand("heist", "Ограбить банк")
     ]
     bot.set_my_commands(cmds)
     bot.infinity_polling()
+    
+    @bot.message_handler(commands=['infect'])
+def infect_cmd(msg):
+    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на жертву!")
+    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
+    if u["coins"] < 300: return bot.reply_to(msg, "❌ Нужно 300!")
+    u["coins"] -= 300; target["dmg"] = max(1, target["dmg"] - 2); save_db()
+    bot.reply_to(msg, f"🦠 Заразил {target['name']}! -2 урона.")
 
-@bot.message_handler(commands=['shop'])
-def shop_cmd(msg):
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton(f"🌾 Ферма ({BUSINESSES['farm']['price']})", callback_data="buy_farm"))
-    kb.add(types.InlineKeyboardButton(f"🌳 Сад ({BUSINESSES['garden']['price']})", callback_data="buy_garden"))
-    kb.add(types.InlineKeyboardButton(f"🏭 Завод ({BUSINESSES['factory']['price']})", callback_data="buy_factory"))
-    bot.reply_to(msg, "🛒 Магазин:", reply_markup=kb)
-
-@bot.message_handler(commands=['daily'])
-def daily_cmd(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Бонус можно брать раз в сутки!")
-    u["last_daily"] = time.time()
-    u["coins"] += 500
-    save_db()
-    bot.reply_to(msg, "🎁 Ежедневный бонус: +500 монет!")
-
-@bot.message_handler(commands=['smuggle'])
-def smuggle_cmd(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту!")
-    u["last_smuggle"] = time.time()
-    if random.random() > 0.5: 
-        u["coins"] += 3000
-        bot.reply_to(msg, "🕵️ Контрабанда удалась! +3000 монет!")
-    else: 
-        u["coins"] -= 1000
-        bot.reply_to(msg, "🚔 Тебя поймали! -1000 монет.")
-    save_db()
-
-@bot.message_handler(commands=['paydebt'])
-def paydebt_cmd(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if u["debt"] <= 0: return bot.reply_to(msg, "✅ У тебя нет долгов!")
-    if u["coins"] < u["debt"]: return bot.reply_to(msg, f"❌ Не хватает монет! Долг: {u['debt']}")
-    u["coins"] -= u["debt"]
-    u["debt"] = 0
-    save_db()
-    bot.reply_to(msg, "✅ Долг полностью погашен!")
-
-@bot.message_handler(commands=['steal'])
-def steal_cmd(msg):
-    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на сообщение жертвы!")
-    u = get_u(msg.from_user.id)
-    target = get_u(msg.reply_to_message.from_user.id)
-    if time.time() - u.get("last_steal", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту!")
-    u["last_steal"] = time.time()
-    if random.random() > 0.4: 
-        s = min(500, target["coins"])
-        target["coins"] -= s
-        u["coins"] += s
-        bot.reply_to(msg, f"🥷 Ты украл {s} монет!")
-    else: 
-        u["coins"] -= 300
-        bot.reply_to(msg, "🚔 Тебя поймали! -300 монет.")
-    save_db()
-
-@bot.message_handler(commands=['duel'])
-def duel_cmd(msg):
-    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на сообщение соперника!")
-    u = get_u(msg.from_user.id)
-    target = get_u(msg.reply_to_message.from_user.id)
-    if time.time() - u.get("last_duel", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту!")
-    u["last_duel"] = time.time()
-    if random.random() > 0.5: 
-        u["coins"] += 500
-        target["coins"] -= 500
-        bot.reply_to(msg, "🤺 Ты победил в дуэли! +500 монет!")
-    else: 
-        u["coins"] -= 500
-        target["coins"] += 500
-        bot.reply_to(msg, "💀 Ты проиграл дуэль! -500 монет.")
-    save_db()
-
-@bot.message_handler(commands=['myclan'])
-def myclan_cmd(msg):
-    u = get_u(msg.from_user.id)
-    if not u.get("clan"): return bot.reply_to(msg, "🛡 У тебя нет клана.")
-    bot.reply_to(msg, "🛡 Твой клан активен.")
-
-@bot.message_handler(commands=['clantop'])
-def clantop_cmd(msg):
-    bot.reply_to(msg, "🏆 Топ кланов.")
-
-@bot.message_handler(commands=['gift'])
-def gift_cmd(msg):
-    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на сообщение того, кому хочешь подарить!")
-    parts = msg.text.split()
-    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ Напиши: /gift 100 (в ответ на сообщение)")
-    a = int(parts[1])
-    u = get_u(msg.from_user.id)
-    target = get_u(msg.reply_to_message.from_user.id)
-    if u["coins"] < a: return bot.reply_to(msg, "❌ Мало монет!")
-    u["coins"] -= a
-    target["coins"] += a
-    save_db()
-    bot.reply_to(msg, f"🎁 Подарил {a} монет игроку {target['name']}!")
-
-if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+@bot.message_handler(commands=['heist'])
+def heist_cmd(msg):
+    if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на напарника!")
+    u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
+    if u["coins"] < 1000 or target["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно по 1000!")
+    total_dmg = u["dmg"] + target["dmg"]
+    if random.randint(1, 100) < (total_dmg * 2):
+        u["coins"] += 2500; target["coins"] += 2500; save_db(); bot.reply_to(msg, "💰 УСПЕХ! Вы забрали по 2500!")
+    else:
+        u["coins"] -= 1000; target["coins"] -= 1000; save_db(); bot.reply_to(msg, "🚔 ВАС ПОВЯЗАЛИ! -1000.")
