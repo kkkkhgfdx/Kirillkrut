@@ -249,6 +249,38 @@ def shop_callback_fixed(call):
         else: 
             u["dmg"] += 5; bot.answer_callback_query(call.id, "🎁 Из кейса выпало +5 к урону!")
         save_db()
+        
+@bot.message_handler(commands=['open'])
+def open_cmd(msg):
+    u = get_u(msg.from_user.id, msg.from_user.first_name)
+    if not u.get("has_chest"): 
+        return bot.reply_to(msg, "❌ У тебя нет кейса! Купи его в магазине (/shop).")
+    
+    u["has_chest"] = False
+    # Рандомим дроп
+    if random.random() > 0.5: 
+        u["coins"] += 2000
+        bot.reply_to(msg, "🎁 Ты открыл кейс и выбил **2000 монет**!")
+    else: 
+        u["dmg"] += 5
+        bot.reply_to(msg, "🎁 Ты открыл кейс и выбил **+5 к урону**!")
+    save_db()
+
+# А этот обработчик добавит кнопку "Открыть" прямо в магазин
+@bot.callback_query_handler(func=lambda call: call.data == "open_chest_now")
+def open_chest_cb(call):
+    u = get_u(call.from_user.id, call.from_user.first_name)
+    if not u.get("has_chest"): 
+        return bot.answer_callback_query(call.id, "❌ Сначала купи кейс!")
+    
+    u["has_chest"] = False
+    if random.random() > 0.5: 
+        u["coins"] += 2000
+        bot.answer_callback_query(call.id, "🎁 Выпало 2000 монет!", show_alert=True)
+    else: 
+        u["dmg"] += 5
+        bot.answer_callback_query(call.id, "🎁 Выпало +5 к урону!", show_alert=True)
+    save_db()
 
 def run_bot():
     cmds = [BotCommand("start", "Старт"), BotCommand("menu", "Меню"), BotCommand("shop", "Магазин"), BotCommand("massa", "Полетели"), BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("business", "Бизнесы"), BotCommand("collect", "Собрать"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"), BotCommand("casino", "Казино"), BotCommand("loan", "Кредит"), BotCommand("paydebt", "Долг"), BotCommand("rob", "Ограбить"), BotCommand("steal", "Украсть"), BotCommand("infect", "Заразить"), BotCommand("hack", "Взлом"), BotCommand("daily", "Бонус")]
