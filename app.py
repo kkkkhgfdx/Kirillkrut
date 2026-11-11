@@ -275,7 +275,7 @@ def run_bot():
     bot.set_my_commands(cmds)
     bot.infinity_polling()
     
-    @bot.message_handler(commands=['infect'])
+@bot.message_handler(commands=['infect'])
 def infect_cmd(msg):
     if not msg.reply_to_message: return bot.reply_to(msg, "❌ Ответь на жертву!")
     u = get_u(msg.from_user.id); target = get_u(msg.reply_to_message.from_user.id)
