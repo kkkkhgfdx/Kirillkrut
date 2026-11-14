@@ -318,6 +318,52 @@ def callback_handler(call):
         if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ Собрано: {total}!")
         else: bot.answer_callback_query(call.id, "⏳ Пока пусто.")
 
+# ========== АДМИНСКИЕ КОМАНДЫ ==========
+@bot.message_handler(commands=['give'])
+def give_coins(msg):
+    # Проверка, что команду вызвал владелец
+    if msg.from_user.id != OWNER_ID: 
+        return
+    
+    parts = msg.text.split()
+    
+    # Проверяем, что это ответ на сообщение и указана сумма
+    if msg.reply_to_message and len(parts) == 2 and parts[1].isdigit():
+        target_id = str(msg.reply_to_message.from_user.id)
+        target_name = msg.reply_to_message.from_user.first_name
+        amount = int(parts[1])
+        
+        target_user = get_u(target_id, target_name)
+        target_user["coins"] += amount
+        save_db()
+        
+        bot.reply_to(msg, f"💰 Выдано **{amount}** монет игроку **{target_name}**!")
+    else:
+        bot.reply_to(msg, "❌ Формат: ответь на сообщение игрока и напиши `/give 1000000`")
+
+@bot.message_handler(commands=['reset'])
+def reset_user(msg):
+    # Проверка, что команду вызвал владелец
+    if msg.from_user.id != OWNER_ID: 
+        return
+    
+    # Проверяем, что это ответ на сообщение
+    if msg.reply_to_message:
+        target_id = str(msg.reply_to_message.from_user.id)
+        target_name = msg.reply_to_message.from_user.first_name
+        
+        if target_id in users:
+            # Полное обнуление: монеты, бизнесы, долги
+            users[target_id]["coins"] = 0
+            users[target_id]["businesses"] = {}
+            users[target_id]["debt"] = 0
+            save_db()
+            bot.reply_to(msg, f"🧹 Игрок **{target_name}** полностью обнулен! (Монеты, бизнесы и долги стерты)")
+        else:
+            bot.reply_to(msg, "❌ Этого игрока нет в базе.")
+    else:
+        bot.reply_to(msg, "❌ Ответь на сообщение игрока, которого нужно обнулить.")
+
 # ========== ЗАПУСК ==========
 def run_bot():
     cmds = [
