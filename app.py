@@ -1,383 +1,287 @@
-import telebot, random, json, os, time, threading
-from telebot import types
-from telebot.types import BotCommand
-from flask import Flask
+import telebot
+import json
+import os
+import random
+import time
 from datetime import datetime
 
-# ========== НАСТРОЙКИ ==========
-TOKEN = "9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0" # СМЕНИ ТОКЕН В BOTFATHER!
-OWNER_ID = 6170286634
-CHAT_ID = -1004215885788
-
+# ================= НАСТРОЙКИ =================
+TOKEN = '9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0'  # ВСТАВЬ СВОЙ ТОКЕН
 bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
-users, boss_hp = {}, 10000
+DB_FILE = 'users.json'
 
-# ========== БАЗА ДАННЫХ ==========
-DB_FILE = "users.json"
-
-def save_db():
-    try:
-        with open(DB_FILE, "w", encoding="utf-8") as f: 
-            json.dump(users, f, ensure_ascii=False, indent=4)
-        with open(DB_FILE, "rb") as f:
-            sent = bot.send_document(CHAT_ID, f, caption="💾 База Синдиката")
-            try: bot.pin_chat_message(CHAT_ID, sent.message_id, disable_notification=True)
-            except: pass
-    except Exception as e:
-        print(f"Ошибка сохранения: {e}")
-
+# ================= БАЗА ДАННЫХ =================
 def load_db():
-    global users
-    try:
-        chat = bot.get_chat(CHAT_ID)
-        if chat.pinned_message and chat.pinned_message.document:
-            downloaded = bot.download_file(bot.get_file(chat.pinned_message.document.file_id).file_path)
-            users = json.loads(downloaded.decode('utf-8'))
-            print("✅ База загружена из канала!")
-            return
-    except: pass
-    
     if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding="utf-8") as f:
-                users = json.load(f)
-            print("✅ Локальная база загружена!")
-            return
-        except: pass
-        
-    users = {}
-    print("⚠️ Создана новая база.")
-load_db()
+        with open(DB_FILE, 'r', encoding='utf-8') as f: return json.load(f)
+    return {}
 
-@app.route('/')
-def health(): return "OK", 200
+def save_db(data):
+    with open(DB_FILE, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
 
-def get_u(uid, name=None):
-    uid_str = str(uid)
-    if uid_str not in users:
-        users[uid_str] = {"coins": 1000, "debt": 0, "lvl": 1, "dmg": 10, "name": name or "Игрок", "businesses": {}, "achieves": [], "last_loan": 0, "last_rob": 0, "last_mine": 0, "last_smuggle": 0, "last_daily": 0, "last_boss_hit": 0, "last_hack": 0}
-    if name: users[uid_str]["name"] = name
-    return users[uid_str]
+# ================= МАГАЗИН =================
+FOOD_SHOP = {
+    "bread": {"name": "🍞 Хлеб", "price": 200, "energy": 20},
+    "cake": {"name": "🧁 Пирожное", "price": 500, "energy": 50},
+    "tort": {"name": "🎂 Торт", "price": 1000, "energy": 100}
+}
 
-def give_achieve(uid, name, reward):
-    u = get_u(uid)
-    if name not in u["achieves"]:
-        u["achieves"].append(name)
-        u["coins"] += reward
-        try: bot.send_message(CHAT_ID, f"🏆 **АЧИВКА!** {u['name']} получил **{name}**!")
-        except: pass
+# Бизнесы (вернул их сюда)
+BUSINESS_SHOP = {
+    "farm": {"name": "🥕 Ферма", "price": 1000, "income": 150},
+    "garden": {"name": "🍎 Сад", "price": 5000, "income": 800},
+    "factory": {"name": "🏭 Завод", "price": 20000, "income": 3500}
+}
 
-# ========== ГЛАВНОЕ МЕНЮ ==========
-def main_kb(uid):
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(types.InlineKeyboardButton("👤 Профиль", callback_data="menu_profile"),
-           types.InlineKeyboardButton("🛒 Магазин", callback_data="menu_shop"))
-    kb.add(types.InlineKeyboardButton("🏢 Бизнесы", callback_data="menu_biz"),
-           types.InlineKeyboardButton("🎰 Казино", callback_data="menu_casino"))
-    kb.add(types.InlineKeyboardButton("🐉 Босс", callback_data="menu_boss"),
-           types.InlineKeyboardButton("🏆 Топ", callback_data="menu_top"))
-    kb.add(types.InlineKeyboardButton("🎁 Ежедневка", callback_data="menu_daily"))
-    return kb
+# ================= КОНТРАКТ =================
+CONTRACT_REWARDS = {
+    1: {"free": 500, "premium": 1000}, 2: {"free": 1000, "premium": 2000},
+    3: {"free": 1500, "premium": 3000}, 4: {"free": 2000, "premium": 5000},
+    5: {"free": 3000, "premium": 8000}, 6: {"free": 4000, "premium": 10000},
+    7: {"free": 5000, "premium": 15000}, 8: {"free": 7000, "premium": 20000},
+    9: {"free": 10000, "premium": 30000}, 10: {"free": 15000, "premium": 50000}
+}
 
-# ========== КОМАНДЫ ==========
-@bot.message_handler(commands=['start', 'menu'])
-def start(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if msg.from_user.username: u["username"] = msg.from_user.username
-    if msg.text == "/start": give_achieve(msg.from_user.id, "Первые шаги", 100)
-    save_db()
-    
-    menu_text = "🔥 **Синдикат v1.0 (Release)**\nЖми кнопки или пиши /help."
-    
-    # === ИВЕНТ ПЯТНИЦА 13 ===
-    if datetime.now().day == 13:
-        menu_text = "🔪 **СЕГОДНЯ ПЯТНИЦА 13-Я!** В СИНДИКАТЕ НЕСПОКОЙНО. КАЗИНО РАБОТАЕТ ПО-КРОВАВОМУ!\n\n" + menu_text
-        
-    bot.send_message(msg.chat.id, menu_text, reply_markup=main_kb(msg.from_user.id), parse_mode="Markdown")
+def add_contract_xp(user, amount):
+    user['contract_xp'] = user.get('contract_xp', 0) + amount
+    if user['contract_xp'] >= 1000:
+        user['contract_xp'] -= 1000
+        user['contract_level'] = user.get('contract_level', 1) + 1
+        if user['contract_level'] > 10:
+            user['contract_level'] = 10
+            user['contract_xp'] = 0
 
-@bot.message_handler(commands=['help'])
-def help_cmd(msg): 
-    bot.reply_to(msg, "📋 **Команды:**\n/profile /top /shop /business /loan /paydebt /rob /hack /boss /casino /mine /smuggle /daily /achieves /gift /save")
+# ================= КОМАНДЫ =================
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    if user_id not in db:
+        db[user_id] = {
+            "balance": 1000, "energy": 100, "max_energy": 100,
+            "level": 1, "xp": 0, "dmg": 15, "debt": 0,
+            "businesses": [], "last_daily": 0, "last_collect": 0,
+            "contract_level": 1, "contract_xp": 0, "is_premium": False
+        }
+        save_db(db)
+    bot.send_message(message.chat.id, "👋 Добро пожаловать в **Синдикат**!\nПиши /menu для управления или /profile для просмотра stats.")
 
 @bot.message_handler(commands=['profile'])
-def profile(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    bot.reply_to(msg, f"👤 {u['name']}\n💰 {u['coins']}\n🏦 Долг: {u.get('debt', 0)}\n📈 Ур: {u['lvl']} (DMG: {u['dmg']})\n🏢 Бизнесов: {len(u['businesses'])}\n🏆 Ачивок: {len(u['achieves'])}")
-
-@bot.message_handler(commands=['top'])
-def top(msg):
-    s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
-    t = "🏆 **Топ:**\n\n"
-    for i, (uid, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name', 'Игрок')} — {d.get('coins', 0)} 💰\n"
-    bot.reply_to(msg, t, parse_mode="Markdown")
-
-@bot.message_handler(commands=['shop'])
-def shop(msg):
-    m = types.InlineKeyboardMarkup(row_width=1)
-    
-    # === ИВЕНТ ПЯТНИЦА 13 (Скидка 13%) ===
-    is_friday_13 = (datetime.now().day == 13)
-    discount = 0.87 if is_friday_13 else 1.0
-    
-    farm_price = int(1000 * discount)
-    garden_price = int(3000 * discount)
-    factory_price = int(10000 * discount)
-    
-    m.add(types.InlineKeyboardButton(f"🌾 Ферма ({farm_price})", callback_data="buy_farm"))
-    m.add(types.InlineKeyboardButton(f"🌳 Сад ({garden_price})", callback_data="buy_garden"))
-    m.add(types.InlineKeyboardButton(f"🏭 Завод ({factory_price})", callback_data="buy_factory"))
-    
-    shop_text = "🛒 **Магазин**"
-    if is_friday_13:
-        shop_text += "\n\n🔥 **СКИДКА 13% НА ВСЕ ТОВАРЫ!**"
-        
-    bot.reply_to(msg, shop_text, reply_markup=m, parse_mode="Markdown")
-
-@bot.message_handler(commands=['business'])
-def business_menu(msg):
-    u = get_u(msg.from_user.id)
-    if not u.get("businesses"): return bot.reply_to(msg, "🏢 Купи в /shop.")
-    m = types.InlineKeyboardMarkup()
-    m.add(types.InlineKeyboardButton("💰 Собрать доход", callback_data="biz_collect"))
-    bot.reply_to(msg, "🏢 **Твои бизнесы**\nЖми кнопку, чтобы собрать бабки.", reply_markup=m, parse_mode="Markdown")
+def profile(message):
+    user = load_db().get(str(message.from_user.id))
+    if not user: return bot.reply_to(message, "Сначала /start")
+    prem = "💎" if user.get('is_premium') else "🆓"
+    text = (f"👤 **Профиль**\n💰 Баланс: {user['balance']}\n"
+            f"⚡ Энергия: {user.get('energy', 100)}/{user.get('max_energy', 100)}\n"
+            f"⭐ Ур: {user['level']} | ⚔️ DMG: {user['dmg']}\n"
+            f"💳 Долг: {user.get('debt', 0)}\n"
+            f"🎟 Контракт: {prem} Ур. {user.get('contract_level', 1)}")
+    bot.reply_to(message, text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['mine'])
-def mine(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_mine", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
-    u["last_mine"] = time.time(); res = random.random()
-    if res > 0.8: w = 1000; u["coins"] += w; bot.reply_to(msg, f"💎 АЛМАЗ! +{w}!")
-    elif res > 0.4: w = 300; u["coins"] += w; bot.reply_to(msg, f"🪙 Золото! +{w}!")
-    else: w = min(50, u["coins"]); u["coins"] -= w; bot.reply_to(msg, f"💥 Обвал! -{w}.")
-    save_db()
-
-@bot.message_handler(commands=['smuggle'])
-def smuggle(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_smuggle", 0) < 60: return bot.reply_to(msg, "❌ Жди минуту.")
-    if u["coins"] < 1000: return bot.reply_to(msg, "❌ Нужно 1000.")
-    u["last_smuggle"] = time.time()
-    if random.random() > 0.5: u["coins"] += 3000; bot.reply_to(msg, "🕵️ +3000!")
-    else: u["coins"] -= 1000; bot.reply_to(msg, "🚔 -1000!")
-    save_db()
-
-@bot.message_handler(commands=['loan'])
-def loan(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_loan", 0) < 10: return bot.reply_to(msg, "❌ Жди 10с.")
-    if u["debt"] > 0: return bot.reply_to(msg, "❌ Верни долг (/paydebt)!")
-    u["last_loan"] = time.time(); u["coins"] += 1000; u["debt"] += 1500; save_db()
-    bot.reply_to(msg, "🏦 +1000. Долг: 1500.")
-
-@bot.message_handler(commands=['paydebt'])
-def paydebt(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if u.get("debt", 0) <= 0: return bot.reply_to(msg, "✅ Нет долгов!")
-    if u["coins"] < u["debt"]: return bot.reply_to(msg, f"❌ Мало! Долг: {u['debt']}.")
-    u["coins"] -= u["debt"]; u["debt"] = 0; save_db()
-    bot.reply_to(msg, "✅ Долг погашен!")
-
-@bot.message_handler(commands=['rob'])
-def rob(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_rob", 0) < 10: return bot.reply_to(msg, "❌ Жди 10с.")
-    u["last_rob"] = time.time()
-    if random.random() > 0.5: u["coins"] += 300; bot.reply_to(msg, "🔫 +300!")
-    else: p = min(200, u["coins"]); u["coins"] -= p; bot.reply_to(msg, f"🚔 -{p}")
-    save_db()
-
-@bot.message_handler(commands=['hack'])
-def hack(msg):
-    u = get_u(msg.from_user.id)
-    if time.time() - u.get("last_hack", 0) < 3600: return bot.reply_to(msg, "❌ Взлом раз в час!")
-    if u["coins"] < 500 or u["dmg"] < 15: return bot.reply_to(msg, "❌ Нужно 500 монет и 15 DMG!")
-    u["last_hack"] = time.time(); u["coins"] -= 500
+def mine(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
+    if user.get('energy', 0) < 10: return bot.reply_to(message, "⚡ Энергия кончилась! Купи еду в /shop.")
     
-    if random.random() > 0.3:
-        targets = [k for k in users if k != str(msg.from_user.id) and users[k]["coins"] > 1000]
-        if targets:
-            victim = random.choice(targets); loot = int(users[victim]["coins"] * 0.1)
-            users[victim]["coins"] -= loot; u["coins"] += loot
-            bot.reply_to(msg, f"💻 Взлом успешен! Ты украл {loot} у {users[victim]['name']}!")
-        else: u["coins"] += 500; bot.reply_to(msg, "💻 Взлом успешен, но все нищие. Вернул 500.")
-    else: bot.reply_to(msg, "🚨 Взлом провален! -500.")
-    save_db()
+    user['energy'] -= 10
+    reward = random.randint(50, 250)
+    user['balance'] += reward
+    add_contract_xp(user, 50)
+    save_db(db)
+    bot.reply_to(message, f"⛏ Найдено {reward} монет!\n+50 XP Контракта.\n⚡ Энергия: {user['energy']}")
 
 @bot.message_handler(commands=['boss'])
-def boss(msg):
-    global boss_hp
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_boss_hit", 0) < 2: return bot.reply_to(msg, "❌ Жди 2 сек.")
-    u["last_boss_hit"] = time.time()
-    if boss_hp <= 0: boss_hp = 10000; return bot.reply_to(msg, "🐉 Новый босс!")
-    dmg = u["dmg"]; boss_hp -= dmg; u["coins"] += dmg * 2; save_db()
-    bot.reply_to(msg, f"🐉 -{dmg} HP. Осталось {boss_hp}.")
+def boss(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
+
+    reward = random.randint(100, 500)
+    xp = random.randint(10, 30)
+    user['balance'] += reward
+    user['xp'] += xp
+    
+    if user['xp'] >= user['level'] * 100:
+        user['level'] += 1
+        user['xp'] = 0
+        user['dmg'] += 5
+        
+    add_contract_xp(user, 100)
+    save_db(db)
+    bot.reply_to(message, f"🐉 Босс повержен!\n+{reward} монет, +{xp} XP, +100 XP Контракта.")
+
+@bot.message_handler(commands=['shop'])
+def shop(message):
+    markup = telebot.types.InlineKeyboardMarkup()
+    # Еда
+    markup.add(telebot.types.InlineKeyboardButton("🍞 Хлеб (200м)", callback_data="buy_food_bread"))
+    markup.add(telebot.types.InlineKeyboardButton("🧁 Пирожное (500м)", callback_data="buy_food_cake"))
+    # Бизнесы
+    markup.add(telebot.types.InlineKeyboardButton("🥕 Ферма (1000м)", callback_data="buy_biz_farm"))
+    markup.add(telebot.types.InlineKeyboardButton("🍎 Сад (5000м)", callback_data="buy_biz_garden"))
+    markup.add(telebot.types.InlineKeyboardButton("🏭 Завод (20000м)", callback_data="buy_biz_factory"))
+    
+    bot.send_message(message.chat.id, "🛒 **Магазин (Еда и Бизнесы):**", reply_markup=markup, parse_mode='Markdown')
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('buy_food_'))
+def buy_food(call):
+    item_id = call.data.replace('buy_food_', '')
+    item = FOOD_SHOP.get(item_id)
+    db = load_db()
+    user = db.get(str(call.from_user.id))
+    
+    if user['balance'] < item['price']: return bot.answer_callback_query(call.id, "❌ Мало денег!")
+    user['balance'] -= item['price']
+    user['energy'] = min(user['max_energy'], user['energy'] + item['energy'])
+    save_db(db)
+    bot.answer_callback_query(call.id, f"✅ Съедено: {item['name']}!")
+    bot.send_message(call.message.chat.id, f"Энергия: {user['energy']}/{user['max_energy']}")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('buy_biz_'))
+def buy_biz(call):
+    biz_id = call.data.replace('buy_biz_', '')
+    biz = BUSINESS_SHOP.get(biz_id)
+    db = load_db()
+    user = db.get(str(call.from_user.id))
+    
+    if biz_id in user['businesses']: return bot.answer_callback_query(call.id, "У тебя уже есть этот бизнес!")
+    if user['balance'] < biz['price']: return bot.answer_callback_query(call.id, "❌ Мало денег!")
+    
+    user['balance'] -= biz['price']
+    user['businesses'].append(biz_id)
+    save_db(db)
+    bot.answer_callback_query(call.id, f"✅ Куплено: {biz['name']}!")
+    bot.send_message(call.message.chat.id, f"Ты купил {biz['name']}! Собирай доход через /business.")
+
+@bot.message_handler(commands=['business'])
+def collect_biz(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if not user['businesses']: return bot.reply_to(message, "У тебя нет бизнесов. Купи в /shop!")
+    
+    current_time = int(time.time())
+    if current_time - user.get('last_collect', 0) < 3600:
+        return bot.reply_to(message, "⏳ Бизнесы еще не принесли доход. Приходи через час.")
+        
+    total_income = sum(BUSINESS_SHOP[b]['income'] for b in user['businesses'])
+    user['balance'] += total_income
+    user['last_collect'] = current_time
+    save_db(db)
+    bot.reply_to(message, f"💸 Ты собрал доход: **+{total_income} монет!**", parse_mode='Markdown')
 
 @bot.message_handler(commands=['casino'])
-def casino(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    parts = msg.text.split()
-    if len(parts) < 2 or not parts[1].isdigit(): return bot.reply_to(msg, "❌ /casino 100")
-    bet = int(parts[1])
-    if bet > u["coins"]: return bot.reply_to(msg, "❌ Мало монет.")
-    
-    # === ИВЕНТ ПЯТНИЦА 13 (Сделка с Дьяволом) ===
-    is_friday_13 = (datetime.now().day == 13)
-    
-    if random.random() > 0.5: 
-        win_amount = bet * 2 if is_friday_13 else bet
-        u["coins"] += win_amount
-        bot.reply_to(msg, f"🎰 Победа! +{win_amount}!" + (" (x2 Пятница 13!)" if is_friday_13 else ""))
-    else: 
-        if is_friday_13:
-            tax = int(bet * 0.13)
-            u["coins"] -= (bet + tax)
-            bot.reply_to(msg, f"💀 Проигрыш! -{bet} + налог на страх 13% (-{tax}).")
+def casino(message):
+    try:
+        amount = int(message.text.split()[1])
+        user_id = str(message.from_user.id)
+        db = load_db()
+        user = db.get(user_id)
+        if user['balance'] < amount: return bot.reply_to(message, "❌ Мало денег.")
+        
+        if random.choice([True, False]):
+            user['balance'] += amount
+            bot.reply_to(message, f"🎰 Победа! Выиграл {amount}.")
         else:
-            u["coins"] -= bet
-            bot.reply_to(msg, f"💀 Проигрыш! -{bet}.")
-    save_db()
+            user['balance'] -= amount
+            bot.reply_to(message, f"🎰 Проигрыш! Потерял {amount}.")
+        add_contract_xp(user, 30)
+        save_db(db)
+    except: bot.reply_to(message, "❌ Пример: /casino 100")
+
+@bot.message_handler(commands=['hack'])
+def hack(message):
+    user = load_db().get(str(message.from_user.id))
+    if user['dmg'] < 15: return bot.reply_to(message, "❌ Нужно 15 DMG.")
+    if random.choice([True, False]):
+        user['balance'] += 500
+        bot.reply_to(message, "💻 Взлом удался! +500 монет.")
+    else: bot.reply_to(message, "💻 Взлом провален.")
+    save_db(load_db())
+
+@bot.message_handler(commands=['loan'])
+def loan(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if user.get('debt', 0) > 0: return bot.reply_to(message, "❌ Уже есть долг.")
+    user['balance'] += 1000
+    user['debt'] = 1500
+    save_db(db)
+    bot.reply_to(message, "💳 Взял 1000. Долг: 1500 (/paydebt).")
+
+@bot.message_handler(commands=['paydebt'])
+def paydebt(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if user.get('debt', 0) == 0: return bot.reply_to(message, "✅ Долгов нет.")
+    if user['balance'] < user['debt']: return bot.reply_to(message, "❌ Мало денег.")
+    user['balance'] -= user['debt']
+    user['debt'] = 0
+    save_db(db)
+    bot.reply_to(message, "✅ Долг погашен!")
 
 @bot.message_handler(commands=['daily'])
-def daily(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    if time.time() - u.get("last_daily", 0) < 86400: return bot.reply_to(msg, "❌ Раз в сутки!")
-    u["last_daily"] = time.time(); u["coins"] += 500; save_db()
-    bot.reply_to(msg, "🎁 +500 монет!")
+def daily(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if int(time.time()) - user.get('last_daily', 0) < 86400: return bot.reply_to(message, "⏳ Приходи завтра.")
+    user['balance'] += 500
+    user['last_daily'] = int(time.time())
+    save_db(db)
+    bot.reply_to(message, "🎁 Бонус +500!")
 
-@bot.message_handler(commands=['achieves'])
-def show_achieves(msg):
-    u = get_u(msg.from_user.id)
-    if not u["achieves"]: return bot.reply_to(msg, "Нет ачивок.")
-    bot.reply_to(msg, "🏆 Ачивки:\n" + "\n".join(u["achieves"]))
-
-@bot.message_handler(commands=['gift'])
-def gift(msg):
-    u = get_u(msg.from_user.id, msg.from_user.first_name)
-    parts = msg.text.split()
-    if msg.reply_to_message:
-        target = get_u(msg.reply_to_message.from_user.id)
-        if len(parts) >= 2 and parts[-1].isdigit():
-            a = int(parts[-1])
-            if u["coins"] < a: return bot.reply_to(msg, "❌ Мало.")
-            u["coins"] -= a; target["coins"] += a; save_db()
-            bot.reply_to(msg, f"🎁 Подарил {a} игроку {target['name']}!")
-        else: bot.reply_to(msg, "❌ /gift 100 в ответ на сообщение")
-
-@bot.message_handler(commands=['save'])
-def save_cmd(msg):
-    if msg.from_user.id == OWNER_ID: save_db(); bot.reply_to(msg, "💾 Сохранено!")
-
-# ========== ИНЛАЙН-КНОПКИ ==========
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    global boss_hp
-    u = get_u(call.from_user.id, call.from_user.first_name)
+# --- КОНТРАКТ ---
+@bot.message_handler(commands=['contract'])
+def show_contract(message):
+    user_id = str(message.from_user.id)
+    db = load_db()
+    user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
     
-    if call.data == "menu_main": 
-        bot.edit_message_text("🔥 **Синдикат v1.0 (Release)**", call.message.chat.id, call.message.message_id, reply_markup=main_kb(call.from_user.id), parse_mode="Markdown")
-    elif call.data == "menu_profile":
-        bot.edit_message_text(f"👤 {u['name']}\n💰 {u['coins']}\n🏦 Долг: {u.get('debt', 0)}", call.message.chat.id, call.message.message_id)
-    elif call.data == "menu_shop":
-        bot.answer_callback_query(call.id, "Напиши /shop для покупок")
-    elif call.data == "menu_biz":
-        bot.answer_callback_query(call.id, "Напиши /business")
-    elif call.data == "menu_casino":
-        bot.answer_callback_query(call.id, "Напиши /casino 100")
-    elif call.data == "menu_boss":
-        bot.answer_callback_query(call.id, f"Босс: {boss_hp} HP. Пиши /boss")
-    elif call.data == "menu_top":
-        s = sorted(users.items(), key=lambda x: x[1].get("coins", 0), reverse=True)
-        t = "🏆 **Топ:**\n\n"
-        for i, (uid, d) in enumerate(s[:10], 1): t += f"{i}. {d.get('name')} — {d.get('coins', 0)}\n"
-        bot.edit_message_text(t, call.message.chat.id, call.message.message_id, parse_mode="Markdown")
-    elif call.data == "menu_daily":
-        bot.answer_callback_query(call.id, "Пиши /daily")
-        
-    elif call.data.startswith("buy_"):
-        i = call.data.split("_")[1]
-        prices = {"farm": 1000, "garden": 3000, "factory": 10000}
-        p = prices.get(i, 99999)
-        
-        # Скидка в магазине
-        if datetime.now().day == 13:
-            p = int(p * 0.87)
-            
-        if u["coins"] < p: return bot.answer_callback_query(call.id, "❌ Мало денег!")
-        u["coins"] -= p
-        if "businesses" not in u: u["businesses"] = {}
-        u["businesses"][i] = time.time()
-        save_db()
-        bot.answer_callback_query(call.id, f"✅ Бизнес куплен за {p}!")
-
-    elif call.data == "biz_collect":
-        total = 0
-        for b, l in list(u["businesses"].items()):
-            if time.time() - l >= 3600: total += 1000; u["businesses"][b] = time.time()
-        if total > 0: u["coins"] += total; save_db(); bot.answer_callback_query(call.id, f"✅ Собрано: {total}!")
-        else: bot.answer_callback_query(call.id, "⏳ Пока пусто.")
-
-# ========== АДМИНСКИЕ КОМАНДЫ ==========
-@bot.message_handler(commands=['give'])
-def give_coins(msg):
-    # Проверка, что команду вызвал владелец
-    if msg.from_user.id != OWNER_ID: 
-        return
+    level = user.get('contract_level', 1)
+    xp = user.get('contract_xp', 0)
+    is_prem = user.get('is_premium', False)
+    bar = "█" * int((xp / 1000) * 10) + "░" * (10 - int((xp / 1000) * 10))
     
-    parts = msg.text.split()
+    text = f"🎟 **Контракт:** {'💎 ПРЕМИУМ' if is_prem else '🆓 БЕСПЛАТНЫЙ'}\n"
+    text += f"Уровень: {level}/10\nПрогресс: `{bar}` {xp}/1000\n"
     
-    # Проверяем, что это ответ на сообщение и указана сумма
-    if msg.reply_to_message and len(parts) == 2 and parts[1].isdigit():
-        target_id = str(msg.reply_to_message.from_user.id)
-        target_name = msg.reply_to_message.from_user.first_name
-        amount = int(parts[1])
-        
-        target_user = get_u(target_id, target_name)
-        target_user["coins"] += amount
-        save_db()
-        
-        bot.reply_to(msg, f"💰 Выдано **{amount}** монет игроку **{target_name}**!")
-    else:
-        bot.reply_to(msg, "❌ Формат: ответь на сообщение игрока и напиши `/give 1000000`")
+    markup = telebot.types.InlineKeyboardMarkup()
+    if not is_prem: markup.add(telebot.types.InlineKeyboardButton("💎 Купить Премиум", callback_data="buy_premium"))
+    markup.add(telebot.types.InlineKeyboardButton("🎁 Забрать награду", callback_data="claim_reward"))
+    bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode='Markdown')
 
-@bot.message_handler(commands=['reset'])
-def reset_user(msg):
-    # Проверка, что команду вызвал владелец
-    if msg.from_user.id != OWNER_ID: 
-        return
+@bot.callback_query_handler(func=lambda call: call.data == "buy_premium")
+def buy_premium(call):
+    db = load_db()
+    user = db.get(str(call.from_user.id))
+    user['is_premium'] = True
+    save_db(db)
+    bot.answer_callback_query(call.id, "💎 Премиум активирован!")
+    bot.send_message(call.message.chat.id, "Ты купил Премиум Контракт! Награды удвоены.")
+
+@bot.callback_query_handler(func=lambda call: call.data == "claim_reward")
+def claim_reward(call):
+    db = load_db()
+    user = db.get(str(call.from_user.id))
+    level = user.get('contract_level', 1)
+    if level > 10: return bot.answer_callback_query(call.id, "Максимальный уровень!")
     
-    # Проверяем, что это ответ на сообщение
-    if msg.reply_to_message:
-        target_id = str(msg.reply_to_message.from_user.id)
-        target_name = msg.reply_to_message.from_user.first_name
-        
-        if target_id in users:
-            # Полное обнуление: монеты, бизнесы, долги
-            users[target_id]["coins"] = 0
-            users[target_id]["businesses"] = {}
-            users[target_id]["debt"] = 0
-            save_db()
-            bot.reply_to(msg, f"🧹 Игрок **{target_name}** полностью обнулен! (Монеты, бизнесы и долги стерты)")
-        else:
-            bot.reply_to(msg, "❌ Этого игрока нет в базе.")
-    else:
-        bot.reply_to(msg, "❌ Ответь на сообщение игрока, которого нужно обнулить.")
+    reward = CONTRACT_REWARDS[level]['premium'] if user.get('is_premium') else CONTRACT_REWARDS[level]['free']
+    user['balance'] += reward
+    user['contract_level'] += 1
+    user['contract_xp'] = 0
+    save_db(db)
+    bot.answer_callback_query(call.id, f"✅ Получено {reward}!")
+    bot.send_message(call.message.chat.id, f"🎁 Награда: {reward} монет!\nНовый уровень: {user['contract_level']}")
 
-# ========== ЗАПУСК ==========
-def run_bot():
-    cmds = [
-        BotCommand("menu", "Меню"), BotCommand("start", "Старт"), BotCommand("help", "Справка"),
-        BotCommand("profile", "Профиль"), BotCommand("top", "Топ"), BotCommand("shop", "Магазин"),
-        BotCommand("business", "Бизнесы"), BotCommand("loan", "Кредит"), BotCommand("paydebt", "Вернуть долг"),
-        BotCommand("rob", "Ограбить"), BotCommand("hack", "Взлом"), BotCommand("boss", "Босс"),
-        BotCommand("casino", "Казино"), BotCommand("mine", "Шахта"), BotCommand("smuggle", "Контрабанда"),
-        BotCommand("daily", "Бонус"), BotCommand("achieves", "Ачивки")
-    ]
-    bot.set_my_commands(cmds)
-    print("🚀 СИНДИКАТ v1.0 (ПЯТНИЦА 13) ЗАПУЩЕН!")
-    bot.infinity_polling()
-
-if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+print("Бот запущен...")
+bot.polling(non_stop=True)
