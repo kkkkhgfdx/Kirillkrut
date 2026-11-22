@@ -9,7 +9,7 @@ import threading
 
 # ================= НАСТРОЙКИ =================
 TOKEN = '9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0'
-CHANNEL_ID = '-100...'  # ВСТАВЬ СЮДА ID КАНАЛА (например, -1001234567890)
+CHANNEL_ID = '-1004215885788'  # ВСТАВЬ СЮДА ID КАНАЛА (например, -1001234567890)
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = 'users.json'
 
