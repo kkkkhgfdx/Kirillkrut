@@ -8,7 +8,7 @@ from flask import Flask
 import threading
 
 # ================= НАСТРОЙКИ =================
-TOKEN = '9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0'
+TOKEN = '9291373316:AAEjyaBDwtP5QihndBnkeCXjUwR6b77DA0'
 CHANNEL_ID = '-1004215885788'  # Твой ID канала
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = 'users.json'
