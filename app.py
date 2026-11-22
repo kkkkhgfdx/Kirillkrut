@@ -9,7 +9,7 @@ import threading
 
 # ================= НАСТРОЙКИ =================
 TOKEN = '9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0'
-CHANNEL_ID = '-1004215885788'  # ВСТАВЬ СЮДА ID КАНАЛА (например, -1001234567890)
+CHANNEL_ID = '-1004215885788'  # Твой ID канала
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = 'users.json'
 
@@ -22,7 +22,6 @@ def home():
 
 # ================= АВТОСОХРАНЕНИЕ В КАНАЛ =================
 def download_db_from_channel():
-    """Скачивает файл users.json из закрепленного сообщения в канале при запуске"""
     try:
         chat_info = bot.get_chat(CHANNEL_ID)
         pinned_message = chat_info.pinned_message
@@ -44,10 +43,8 @@ def download_db_from_channel():
         return False
 
 def upload_db_to_channel():
-    """Отправляет обновленный users.json в канал и закрепляет его"""
     if not os.path.exists(DB_FILE):
         return
-        
     try:
         chat_info = bot.get_chat(CHANNEL_ID)
         if chat_info.pinned_message:
@@ -89,7 +86,9 @@ BUSINESS_SHOP = {
 def start(message):
     user_id = str(message.from_user.id)
     db = load_db()
-    if user_id not in db:
+    
+    # Защита от старой/кривой базы
+    if user_id not in db or 'balance' not in db[user_id]:
         db[user_id] = {
             "name": message.from_user.first_name,
             "balance": 1000, "level": 1, "xp": 0, "dmg": 15, "debt": 0,
@@ -123,9 +122,16 @@ def menu(message):
 def profile(message):
     user = load_db().get(str(message.from_user.id))
     if not user: return bot.reply_to(message, "Сначала /start")
-    text = (f"👤 **Профиль**\n💰 Баланс: {user['balance']}\n"
-            f"⭐ Ур: {user['level']} | ⚔️ DMG: {user['dmg']}\n"
-            f"💳 Долг: {user.get('debt', 0)}")
+    
+    # Безопасное извлечение данных
+    balance = user.get('balance', 0)
+    level = user.get('level', 1)
+    dmg = user.get('dmg', 15)
+    debt = user.get('debt', 0)
+    
+    text = (f"👤 **Профиль**\n💰 Баланс: {balance}\n"
+            f"⭐ Ур: {level} | ⚔️ DMG: {dmg}\n"
+            f"💳 Долг: {debt}")
     bot.reply_to(message, text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['shop'])
@@ -143,10 +149,15 @@ def buy_biz(call):
     db = load_db()
     user = db.get(str(call.from_user.id))
     
-    if biz_id in user['businesses']: return bot.answer_callback_query(call.id, "У тебя уже есть этот бизнес!")
-    if user['balance'] < biz['price']: return bot.answer_callback_query(call.id, "❌ Мало денег!")
+    if not user: return bot.answer_callback_query(call.id, "Напиши /start")
     
-    user['balance'] -= biz['price']
+    if biz_id in user.get('businesses', []): 
+        return bot.answer_callback_query(call.id, "У тебя уже есть этот бизнес!")
+    if user.get('balance', 0) < biz['price']: 
+        return bot.answer_callback_query(call.id, "❌ Мало денег!")
+    
+    user['balance'] = user.get('balance', 0) - biz['price']
+    if 'businesses' not in user: user['businesses'] = []
     user['businesses'].append(biz_id)
     save_db(db)
     bot.answer_callback_query(call.id, f"✅ Куплено: {biz['name']}!")
@@ -157,14 +168,15 @@ def collect_biz(message):
     user_id = str(message.from_user.id)
     db = load_db()
     user = db.get(user_id)
-    if not user.get('businesses'): return bot.reply_to(message, "У тебя нет бизнесов. Купи в /shop!")
+    if not user or not user.get('businesses'): 
+        return bot.reply_to(message, "У тебя нет бизнесов. Купи в /shop!")
     
     current_time = int(time.time())
     if current_time - user.get('last_collect', 0) < 3600:
         return bot.reply_to(message, "⏳ Бизнесы еще не принесли доход. Приходи через час.")
         
     total_income = sum(BUSINESS_SHOP[b]['income'] for b in user['businesses'])
-    user['balance'] += total_income
+    user['balance'] = user.get('balance', 0) + total_income
     user['last_collect'] = current_time
     save_db(db)
     bot.reply_to(message, f"💸 Ты собрал доход: **+{total_income} монет!**", parse_mode='Markdown')
@@ -177,7 +189,7 @@ def mine(message):
     if not user: return bot.reply_to(message, "Сначала /start")
     
     reward = random.randint(50, 250)
-    user['balance'] += reward
+    user['balance'] = user.get('balance', 0) + reward
     save_db(db)
     bot.reply_to(message, f"⛏ Ты нашел {reward} монет в шахте!")
 
@@ -190,13 +202,13 @@ def boss(message):
 
     reward = random.randint(100, 500)
     xp = random.randint(10, 30)
-    user['balance'] += reward
-    user['xp'] += xp
+    user['balance'] = user.get('balance', 0) + reward
+    user['xp'] = user.get('xp', 0) + xp
     
-    if user['xp'] >= user['level'] * 100:
-        user['level'] += 1
+    if user['xp'] >= user.get('level', 1) * 100:
+        user['level'] = user.get('level', 1) + 1
         user['xp'] = 0
-        user['dmg'] += 5
+        user['dmg'] = user.get('dmg', 15) + 5
         
     save_db(db)
     bot.reply_to(message, f"🐉 Босс повержен!\n+{reward} монет, +{xp} XP.")
@@ -208,14 +220,16 @@ def casino(message):
         user_id = str(message.from_user.id)
         db = load_db()
         user = db.get(user_id)
+        
+        if not user: return bot.reply_to(message, "Сначала /start")
         if amount <= 0: return bot.reply_to(message, "❌ Ставка > 0.")
-        if user['balance'] < amount: return bot.reply_to(message, "❌ Мало денег.")
+        if user.get('balance', 0) < amount: return bot.reply_to(message, "❌ Мало денег.")
         
         if random.choice([True, False]):
-            user['balance'] += amount
+            user['balance'] = user.get('balance', 0) + amount
             bot.reply_to(message, f"🎰 Победа! Выиграл {amount}.")
         else:
-            user['balance'] -= amount
+            user['balance'] = user.get('balance', 0) - amount
             bot.reply_to(message, f"🎰 Проигрыш! Потерял {amount}.")
         save_db(db)
     except: bot.reply_to(message, "❌ Пример: /casino 100")
@@ -226,10 +240,10 @@ def hack(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    if user['dmg'] < 15: return bot.reply_to(message, "❌ Нужно 15 DMG.")
+    if user.get('dmg', 15) < 15: return bot.reply_to(message, "❌ Нужно 15 DMG.")
     
     if random.choice([True, False]):
-        user['balance'] += 500
+        user['balance'] = user.get('balance', 0) + 500
         bot.reply_to(message, "💻 Взлом удался! +500 монет.")
     else: 
         bot.reply_to(message, "💻 Взлом провален.")
@@ -240,8 +254,9 @@ def loan(message):
     user_id = str(message.from_user.id)
     db = load_db()
     user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
     if user.get('debt', 0) > 0: return bot.reply_to(message, "❌ Уже есть долг.")
-    user['balance'] += 1000
+    user['balance'] = user.get('balance', 0) + 1000
     user['debt'] = 1500
     save_db(db)
     bot.reply_to(message, "💳 Взял 1000. Долг: 1500 (/paydebt).")
@@ -251,8 +266,9 @@ def paydebt(message):
     user_id = str(message.from_user.id)
     db = load_db()
     user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
     if user.get('debt', 0) == 0: return bot.reply_to(message, "✅ Долгов нет.")
-    if user['balance'] < user['debt']: return bot.reply_to(message, "❌ Мало денег.")
+    if user.get('balance', 0) < user.get('debt', 0): return bot.reply_to(message, "❌ Мало денег.")
     user['balance'] -= user['debt']
     user['debt'] = 0
     save_db(db)
@@ -263,8 +279,9 @@ def daily(message):
     user_id = str(message.from_user.id)
     db = load_db()
     user = db.get(user_id)
+    if not user: return bot.reply_to(message, "Сначала /start")
     if int(time.time()) - user.get('last_daily', 0) < 86400: return bot.reply_to(message, "⏳ Приходи завтра.")
-    user['balance'] += 500
+    user['balance'] = user.get('balance', 0) + 500
     user['last_daily'] = int(time.time())
     save_db(db)
     bot.reply_to(message, "🎁 Бонус +500!")
@@ -275,13 +292,13 @@ def smuggle(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    if user['balance'] < 1000: return bot.reply_to(message, "❌ Нужно 1000 монет для контрабанды.")
+    if user.get('balance', 0) < 1000: return bot.reply_to(message, "❌ Нужно 1000 монет для контрабанды.")
     
     if random.choice([True, False]):
-        user['balance'] += 2000
+        user['balance'] = user.get('balance', 0) + 2000
         bot.reply_to(message, "🚢 Контрабанда удалась! +2000 монет.")
     else:
-        user['balance'] -= 1000
+        user['balance'] = user.get('balance', 0) - 1000
         bot.reply_to(message, "🚔 Контрабанда провалилась! Ты потерял 1000 монет.")
     save_db(db)
 
@@ -294,11 +311,11 @@ def rob(message):
     
     if random.choice([True, False]):
         reward = random.randint(200, 600)
-        user['balance'] += reward
+        user['balance'] = user.get('balance', 0) + reward
         bot.reply_to(message, f"🥷 Ты успешно ограбил прохожего! +{reward} монет.")
     else:
         fine = random.randint(100, 300)
-        user['balance'] -= fine
+        user['balance'] = user.get('balance', 0) - fine
         bot.reply_to(message, f"🚓 Тебя поймали! Штраф: -{fine} монет.")
     save_db(db)
 
@@ -306,6 +323,7 @@ def rob(message):
 def top(message):
     db = load_db()
     if not db: return bot.reply_to(message, "База пуста.")
+    # Безопасная сортировка
     sorted_users = sorted(db.items(), key=lambda x: x[1].get('balance', 0), reverse=True)
     text = "🏆 **Топ-10 богатейших:**\n\n"
     for i, (uid, data) in enumerate(sorted_users[:10], 1):
@@ -331,21 +349,22 @@ def daily_case(message):
         return bot.reply_to(message, f"⏳ Кейс еще не восстановился. Приходи через {hours} ч. {minutes} мин.")
     
     roll = random.randint(1, 100)
+    balance = user.get('balance', 0)
     
     if roll <= 50:
         reward = random.randint(200, 500)
-        user['balance'] += reward
+        user['balance'] = balance + reward
         text = f"📦 Ты открыл кейс и нашел **{reward} монет**!"
     elif roll <= 80:
         reward = random.randint(1000, 2000)
-        user['balance'] += reward
+        user['balance'] = balance + reward
         text = f"🎁 Ого! В кейсе был **крупный куш: {reward} монет**!"
     elif roll <= 95:
-        user['dmg'] += 2
+        user['dmg'] = user.get('dmg', 15) + 2
         text = "⚔️ Невероятная удача! Ты нашел в кейсе **+2 DMG**!"
     else:
         reward = 10000
-        user['balance'] += reward
+        user['balance'] = balance + reward
         text = f"🔥 **ДЖЕКПОТ!!!** Ты сорвал банк: **{reward} монет**! 🔥"
     
     user['last_case'] = current_time
@@ -354,14 +373,11 @@ def daily_case(message):
 
 # ================= ЗАПУСК =================
 def run_bot():
-    download_db_from_channel() # Скачиваем базу при старте
+    download_db_from_channel()
     bot.polling(non_stop=True)
 
 if __name__ == '__main__':
-    # 1. Запускаем бота в фоне
     t = threading.Thread(target=run_bot)
     t.start()
-    
-    # 2. Запускаем Flask, чтобы Render видел открытый порт
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
