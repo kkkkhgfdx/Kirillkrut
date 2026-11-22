@@ -4,11 +4,20 @@ import os
 import random
 import time
 from datetime import datetime
+from flask import Flask
+import threading
 
 # ================= НАСТРОЙКИ =================
-TOKEN = '9002014471:AAE_AOkZk6e8P8GRw1EhwsX3tfYIskE5m-I'
+TOKEN = '9291373316:AAEjyaBDwtP15QihndBnkeCXjUwR6b77DA0'
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = 'users.json'
+
+# --- FLASK (чтобы Render видел порт) ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Бот Синдикат работает!"
 
 # ================= БАЗА ДАННЫХ =================
 def load_db():
@@ -27,8 +36,6 @@ def save_db(data):
 
 # ================= УВЕДОМЛЕНИЯ =================
 def check_notify(chat_id, user):
-    """Проверяет, доступна ли награда, и шлет уведомление"""
-    # Если XP больше 1000, но награда еще не забрана (уровень не поднялся)
     if user.get('contract_xp', 0) >= 1000:
         text = (
             "🔔 **Внимание, Агент!**\n\n"
@@ -63,10 +70,8 @@ CONTRACT_REWARDS = {
 
 def add_contract_xp(user, amount):
     user['contract_xp'] = user.get('contract_xp', 0) + amount
-    # Мы НЕ повышаем уровень автоматически, а даем XP. Уровень повышается только при нажатии "Забрать награду"
 
 # ================= КОМАНДЫ =================
-
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = str(message.from_user.id)
@@ -87,10 +92,7 @@ def profile(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    
-    # Проверка наград
     check_notify(message.chat.id, user)
-    
     prem = "💎" if user.get('is_premium') else "🆓"
     text = (f"👤 **Профиль**\n💰 Баланс: {user['balance']}\n"
             f"⚡ Энергия: {user.get('energy', 100)}/{user.get('max_energy', 100)}\n"
@@ -106,16 +108,12 @@ def mine(message):
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
     if user.get('energy', 0) < 10: return bot.reply_to(message, "⚡ Энергия кончилась! Купи еду в /shop.")
-    
     user['energy'] -= 10
     reward = random.randint(50, 250)
     user['balance'] += reward
-    add_contract_xp(user, 50) # Добавляем XP
+    add_contract_xp(user, 50)
     save_db(db)
-    
     bot.reply_to(message, f"⛏ Найдено {reward} монет!\n+50 XP Контракта.\n⚡ Энергия: {user['energy']}")
-    
-    # Проверка наград
     check_notify(message.chat.id, user)
 
 @bot.message_handler(commands=['boss'])
@@ -124,23 +122,17 @@ def boss(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-
     reward = random.randint(100, 500)
     xp = random.randint(10, 30)
     user['balance'] += reward
     user['xp'] += xp
-    
     if user['xp'] >= user['level'] * 100:
         user['level'] += 1
         user['xp'] = 0
         user['dmg'] += 5
-        
-    add_contract_xp(user, 100) # Добавляем XP
+    add_contract_xp(user, 100)
     save_db(db)
-    
     bot.reply_to(message, f"🐉 Босс повержен!\n+{reward} монет, +{xp} XP, +100 XP Контракта.")
-    
-    # Проверка наград
     check_notify(message.chat.id, user)
 
 @bot.message_handler(commands=['shop'])
@@ -151,7 +143,6 @@ def shop(message):
     markup.add(telebot.types.InlineKeyboardButton("🥕 Ферма (1000м)", callback_data="buy_biz_farm"))
     markup.add(telebot.types.InlineKeyboardButton("🍎 Сад (5000м)", callback_data="buy_biz_garden"))
     markup.add(telebot.types.InlineKeyboardButton("🏭 Завод (20000м)", callback_data="buy_biz_factory"))
-    
     bot.send_message(message.chat.id, "🛒 **Магазин (Еда и Бизнесы):**", reply_markup=markup, parse_mode='Markdown')
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('buy_food_'))
@@ -160,7 +151,6 @@ def buy_food(call):
     item = FOOD_SHOP.get(item_id)
     db = load_db()
     user = db.get(str(call.from_user.id))
-    
     if user['balance'] < item['price']: return bot.answer_callback_query(call.id, "❌ Мало денег!")
     user['balance'] -= item['price']
     user['energy'] = min(user['max_energy'], user['energy'] + item['energy'])
@@ -174,10 +164,8 @@ def buy_biz(call):
     biz = BUSINESS_SHOP.get(biz_id)
     db = load_db()
     user = db.get(str(call.from_user.id))
-    
     if biz_id in user['businesses']: return bot.answer_callback_query(call.id, "У тебя уже есть этот бизнес!")
     if user['balance'] < biz['price']: return bot.answer_callback_query(call.id, "❌ Мало денег!")
-    
     user['balance'] -= biz['price']
     user['businesses'].append(biz_id)
     save_db(db)
@@ -190,11 +178,9 @@ def collect_biz(message):
     db = load_db()
     user = db.get(user_id)
     if not user.get('businesses'): return bot.reply_to(message, "У тебя нет бизнесов. Купи в /shop!")
-    
     current_time = int(time.time())
     if current_time - user.get('last_collect', 0) < 3600:
         return bot.reply_to(message, "⏳ Бизнесы еще не принесли доход. Приходи через час.")
-        
     total_income = sum(BUSINESS_SHOP[b]['income'] for b in user['businesses'])
     user['balance'] += total_income
     user['last_collect'] = current_time
@@ -209,7 +195,6 @@ def casino(message):
         db = load_db()
         user = db.get(user_id)
         if user['balance'] < amount: return bot.reply_to(message, "❌ Мало денег.")
-        
         if random.choice([True, False]):
             user['balance'] += amount
             bot.reply_to(message, f"🎰 Победа! Выиграл {amount}.")
@@ -270,9 +255,7 @@ def smuggle(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    
     if user['balance'] < 1000: return bot.reply_to(message, "❌ Нужно 1000 монет для контрабанды.")
-    
     if random.choice([True, False]):
         user['balance'] += 2000
         bot.reply_to(message, "🚢 Контрабанда удалась! +2000 монет.")
@@ -288,7 +271,6 @@ def rob(message):
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    
     if random.choice([True, False]):
         reward = random.randint(200, 600)
         user['balance'] += reward
@@ -303,7 +285,6 @@ def rob(message):
 def top(message):
     db = load_db()
     if not db: return bot.reply_to(message, "База пуста.")
-    
     sorted_users = sorted(db.items(), key=lambda x: x[1].get('balance', 0), reverse=True)
     text = "🏆 **Топ-10 богатейших:**\n\n"
     for i, (uid, data) in enumerate(sorted_users[:10], 1):
@@ -312,25 +293,19 @@ def top(message):
         text += f"{i}. {name} — {balance} 💰\n"
     bot.reply_to(message, text, parse_mode='Markdown')
 
-# --- КОНТРАКТ ---
 @bot.message_handler(commands=['contract'])
 def show_contract(message):
     user_id = str(message.from_user.id)
     db = load_db()
     user = db.get(user_id)
     if not user: return bot.reply_to(message, "Сначала /start")
-    
     level = user.get('contract_level', 1)
     xp = user.get('contract_xp', 0)
     is_prem = user.get('is_premium', False)
-    
-    # Прогресс-бар (максимум 1000 XP)
     bar_progress = min(10, int((xp / 1000) * 10))
     bar = "█" * bar_progress + "░" * (10 - bar_progress)
-    
     text = f"🎟 **Контракт:** {'💎 ПРЕМИУМ' if is_prem else '🆓 БЕСПЛАТНЫЙ'}\n"
     text += f"Уровень: {level}/10\nПрогресс: `{bar}` {xp}/1000\n"
-    
     markup = telebot.types.InlineKeyboardMarkup()
     if not is_prem: 
         markup.add(telebot.types.InlineKeyboardButton(f"💎 Купить Премиум ({PREMIUM_PRICE} монет)", callback_data="buy_premium_coins"))
@@ -341,17 +316,11 @@ def show_contract(message):
 def buy_premium_coins(call):
     db = load_db()
     user = db.get(str(call.from_user.id))
-    
-    if user.get('is_premium'):
-        return bot.answer_callback_query(call.id, "У тебя уже есть Премиум!")
-        
-    if user['balance'] < PREMIUM_PRICE:
-        return bot.answer_callback_query(call.id, f"❌ Не хватает монет! Нужно {PREMIUM_PRICE}.", show_alert=True)
-        
+    if user.get('is_premium'): return bot.answer_callback_query(call.id, "У тебя уже есть Премиум!")
+    if user['balance'] < PREMIUM_PRICE: return bot.answer_callback_query(call.id, f"❌ Не хватает монет! Нужно {PREMIUM_PRICE}.", show_alert=True)
     user['balance'] -= PREMIUM_PRICE
     user['is_premium'] = True
     save_db(db)
-    
     bot.answer_callback_query(call.id, "💎 Премиум куплен!")
     bot.send_message(call.message.chat.id, f"💎 **Поздравляю!** Ты купил Премиум Контракт за {PREMIUM_PRICE} монет.\nТеперь твои награды удвоены!")
 
@@ -361,20 +330,25 @@ def claim_reward(call):
     user = db.get(str(call.from_user.id))
     level = user.get('contract_level', 1)
     xp = user.get('contract_xp', 0)
-    
-    if level > 10: 
-        return bot.answer_callback_query(call.id, "Максимальный уровень!")
-    if xp < 1000:
-        return bot.answer_callback_query(call.id, "❌ Ты еще не накопил 1000 XP!", show_alert=True)
-    
+    if level > 10: return bot.answer_callback_query(call.id, "Максимальный уровень!")
+    if xp < 1000: return bot.answer_callback_query(call.id, "❌ Ты еще не накопил 1000 XP!", show_alert=True)
     reward = CONTRACT_REWARDS[level]['premium'] if user.get('is_premium') else CONTRACT_REWARDS[level]['free']
     user['balance'] += reward
     user['contract_level'] += 1
-    user['contract_xp'] = 0 # Сбрасываем XP
+    user['contract_xp'] = 0
     save_db(db)
-    
     bot.answer_callback_query(call.id, f"✅ Получено {reward}!")
     bot.send_message(call.message.chat.id, f"🎁 Награда: {reward} монет!\nНовый уровень: {user['contract_level']}")
 
-print("Бот запущен...")
-bot.polling(non_stop=True)
+# ================= ЗАПУСК =================
+def run_bot():
+    bot.polling(non_stop=True)
+
+if __name__ == '__main__':
+    # Запускаем бота в отдельном потоке
+    t = threading.Thread(target=run_bot)
+    t.start()
+    
+    # Запускаем Flask, чтобы Render видел порт
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
